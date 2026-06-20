@@ -187,7 +187,7 @@ def register(req: RegisterRequest):
         raise HTTPException(status_code=500, detail="Server error during registration.")
 
 
-# 2. LOGIN — Step 1: Verify password, then send OTP
+# 2. LOGIN — Verify password and return token directly (no OTP)
 @router.post("/login")
 def login(req: LoginRequest):
     try:
@@ -262,43 +262,19 @@ def login(req: LoginRequest):
         if not bcrypt.verify(req.password, matched_user["password_hash"]):
             raise HTTPException(status_code=400, detail="Invalid credentials.")
 
-        user_email = matched_user["email"]
-        user_name = (
-            profile_details.get("name") or
-            profile_details.get("company") or
-            "User"
-        )
-
-        # --- Generate & Store OTP ---
-        otp_code = generate_otp()
-        expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=10)
-
-        execute_query(
-            """INSERT INTO otp_codes (user_email, otp_code, expires_at, used)
-               VALUES (%s, %s, %s, FALSE)""",
-            (user_email, otp_code, expires_at),
-            commit=True,
-            fetch=False
-        )
-
-        # --- Send OTP ---
-        send_otp_email(user_email, otp_code, user_name)
-
-        # Send OTP SMS if phone is configured
-        user_phone = matched_user.get("phone")
-        if user_phone:
-            user_phone_cleaned = re.sub(r"[\s\-\+\(\)]", "", user_phone)
-            if re.match(r"^91\d{10}$", user_phone_cleaned):
-                send_otp_sms(user_phone_cleaned, otp_code)
-
-        # --- Return OTP token (short-lived, carries email + role) ---
-        otp_token = create_otp_token(user_email, role)
+        # --- Login does NOT require OTP — return token directly ---
+        user_id = matched_user["id"]
+        token = create_access_token(user_id, role)
 
         return {
-            "requires_otp": True,
-            "otp_token": otp_token,
-            "email": user_email,         # so frontend can display masked email
-            "message": f"An OTP has been sent to {user_email}"
+            "token": token,
+            "user": {
+                "id": user_id,
+                "email": matched_user["email"],
+                "phone": matched_user.get("phone"),
+                "role": role,
+                **profile_details
+            }
         }
 
     except HTTPException:

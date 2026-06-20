@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Lock, Mail, Hotel, Check, Eye, EyeOff, Loader2, ShieldCheck, RotateCcw, ArrowLeft } from 'lucide-react';
+import React, { useState } from 'react';
+import { Lock, Mail, Hotel, Check, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 export default function Login({ onAuthSuccess, setCurrentPage }) {
   const [emailOrPhone, setEmailOrPhone] = useState('');
@@ -8,156 +8,6 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  // OTP state
-  const [otpStep, setOtpStep] = useState(false);         // true = show OTP screen
-  const [otpToken, setOtpToken] = useState('');           // short-lived JWT from backend
-  const [otpEmail, setOtpEmail] = useState('');           // email to show user
-  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
-  const [otpError, setOtpError] = useState('');
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [resendCooldown, setResendCooldown] = useState(0); // seconds
-  const [otpExpiry, setOtpExpiry] = useState(600);        // 10 minutes in seconds
-  const otpRefs = useRef([]);
-  const resendTimerRef = useRef(null);
-  const expiryTimerRef = useRef(null);
-
-  // Cleanup timers on unmount
-  useEffect(() => {
-    return () => {
-      if (resendTimerRef.current) clearInterval(resendTimerRef.current);
-      if (expiryTimerRef.current) clearInterval(expiryTimerRef.current);
-    };
-  }, []);
-
-  const startOtpTimers = () => {
-    // Resend cooldown: 60 seconds
-    setResendCooldown(60);
-    if (resendTimerRef.current) clearInterval(resendTimerRef.current);
-    resendTimerRef.current = setInterval(() => {
-      setResendCooldown(prev => {
-        if (prev <= 1) { clearInterval(resendTimerRef.current); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-
-    // OTP expiry: 10 minutes
-    setOtpExpiry(600);
-    if (expiryTimerRef.current) clearInterval(expiryTimerRef.current);
-    expiryTimerRef.current = setInterval(() => {
-      setOtpExpiry(prev => {
-        if (prev <= 1) { clearInterval(expiryTimerRef.current); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  const maskEmail = (email) => {
-    if (!email) return '';
-    const [user, domain] = email.split('@');
-    if (!domain) return email;
-    const masked = user.length > 2
-      ? user[0] + '•'.repeat(user.length - 2) + user[user.length - 1]
-      : user[0] + '•';
-    return `${masked}@${domain}`;
-  };
-
-  const formatTime = (secs) => {
-    const m = Math.floor(secs / 60).toString().padStart(2, '0');
-    const s = (secs % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
-  };
-
-  // Handle OTP digit input
-  const handleOtpChange = (idx, val) => {
-    const digit = val.replace(/\D/g, '').slice(-1);
-    const next = [...otpDigits];
-    next[idx] = digit;
-    setOtpDigits(next);
-    setOtpError('');
-    if (digit && idx < 5) {
-      otpRefs.current[idx + 1]?.focus();
-    }
-  };
-
-  const handleOtpKeyDown = (idx, e) => {
-    if (e.key === 'Backspace' && !otpDigits[idx] && idx > 0) {
-      otpRefs.current[idx - 1]?.focus();
-    }
-  };
-
-  const handleOtpPaste = (e) => {
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-    if (pasted.length === 6) {
-      setOtpDigits(pasted.split(''));
-      otpRefs.current[5]?.focus();
-    }
-    e.preventDefault();
-  };
-
-  // Submit OTP
-  const handleOtpVerify = async () => {
-    const code = otpDigits.join('');
-    if (code.length < 6) {
-      setOtpError('Please enter all 6 digits.');
-      return;
-    }
-    if (otpExpiry === 0) {
-      setOtpError('OTP has expired. Please log in again.');
-      return;
-    }
-    setOtpLoading(true);
-    setOtpError('');
-    try {
-      const res = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ otp_token: otpToken, otp_code: code })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        await onAuthSuccess(data.token, data.user);
-        if (data.user.role === 'admin') setCurrentPage('admin-dashboard');
-        else if (data.user.role === 'recruiter') setCurrentPage('recruiter-dashboard');
-        else setCurrentPage('student-dashboard');
-      } else {
-        setOtpError(data.detail || 'Invalid OTP. Please try again.');
-        setOtpDigits(['', '', '', '', '', '']);
-        otpRefs.current[0]?.focus();
-      }
-    } catch {
-      setOtpError('Connection error. Please try again.');
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  // Resend OTP
-  const handleResendOtp = async () => {
-    if (resendCooldown > 0) return;
-    setOtpLoading(true);
-    setOtpError('');
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emailOrPhone, password })
-      });
-      const data = await res.json();
-      if (res.ok && data.requires_otp) {
-        setOtpToken(data.otp_token);
-        setOtpDigits(['', '', '', '', '', '']);
-        startOtpTimers();
-        otpRefs.current[0]?.focus();
-      } else {
-        setOtpError('Could not resend OTP. Please go back and try again.');
-      }
-    } catch {
-      setOtpError('Connection error. Please try again.');
-    } finally {
-      setOtpLoading(false);
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -205,21 +55,12 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
 
       const data = await res.json();
 
-      if (res.ok) {
-        if (data.requires_otp) {
-          // Step 2: Show OTP screen
-          setOtpToken(data.otp_token);
-          setOtpEmail(data.email || loginInput);
-          setOtpStep(true);
-          startOtpTimers();
-          setTimeout(() => otpRefs.current[0]?.focus(), 100);
-        } else {
-          // Direct login (fallback if OTP somehow bypassed)
-          await onAuthSuccess(data.token, data.user);
-          if (data.user.role === 'admin') setCurrentPage('admin-dashboard');
-          else if (data.user.role === 'recruiter') setCurrentPage('recruiter-dashboard');
-          else setCurrentPage('student-dashboard');
-        }
+      if (res.ok && data.token) {
+        // Direct login — go straight to dashboard
+        await onAuthSuccess(data.token, data.user);
+        if (data.user.role === 'admin') setCurrentPage('admin-dashboard');
+        else if (data.user.role === 'recruiter') setCurrentPage('recruiter-dashboard');
+        else setCurrentPage('student-dashboard');
       } else {
         setError(data.detail || data.message || 'Invalid credentials.');
       }
@@ -312,131 +153,6 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
     }
   };
 
-  // ── OTP SCREEN ──────────────────────────────────────────────────────────────
-  if (otpStep) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-6">
-        <div className="w-full max-w-md">
-          {/* Card */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-200/10">
-            {/* Top accent bar */}
-            <div className="h-1.5 w-full bg-gradient-to-r from-blue-800 via-blue-600 to-amber-500" />
-
-            <div className="p-8 flex flex-col gap-6">
-              {/* Icon + Heading */}
-              <div className="flex flex-col items-center gap-3 text-center">
-                <div className="h-16 w-16 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 flex items-center justify-center">
-                  <ShieldCheck className="h-8 w-8 text-blue-700 dark:text-blue-400" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-extrabold text-slate-900 dark:text-white">Verify Your Identity</h1>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                    We sent a 6-digit code to
-                  </p>
-                  <p className="text-sm font-semibold text-blue-700 dark:text-amber-400 mt-0.5">
-                    {maskEmail(otpEmail)}
-                  </p>
-                </div>
-              </div>
-
-              {/* OTP Error */}
-              {otpError && (
-                <div className="p-3 text-xs rounded-xl bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/50 text-center">
-                  {otpError}
-                </div>
-              )}
-
-              {/* 6-digit input */}
-              <div className="flex gap-2 justify-center" onPaste={handleOtpPaste}>
-                {otpDigits.map((digit, idx) => (
-                  <input
-                    key={idx}
-                    ref={el => (otpRefs.current[idx] = el)}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={digit}
-                    onChange={e => handleOtpChange(idx, e.target.value)}
-                    onKeyDown={e => handleOtpKeyDown(idx, e)}
-                    className={`w-12 h-14 text-center text-xl font-bold rounded-xl border-2 outline-none transition-all
-                      ${digit
-                        ? 'border-blue-600 bg-blue-50 text-blue-800 dark:border-amber-500 dark:bg-amber-950/20 dark:text-amber-300'
-                        : 'border-slate-200 bg-slate-50 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white'
-                      }
-                      focus:border-blue-700 focus:ring-2 focus:ring-blue-200 dark:focus:border-amber-500 dark:focus:ring-amber-900/30`}
-                  />
-                ))}
-              </div>
-
-              {/* Expiry timer */}
-              <div className="text-center text-xs">
-                {otpExpiry > 0 ? (
-                  <span className="text-slate-500 dark:text-slate-400">
-                    Code expires in{' '}
-                    <span className={`font-bold ${otpExpiry < 60 ? 'text-red-500' : 'text-blue-700 dark:text-amber-400'}`}>
-                      {formatTime(otpExpiry)}
-                    </span>
-                  </span>
-                ) : (
-                  <span className="text-red-500 font-semibold">Code has expired. Please log in again.</span>
-                )}
-              </div>
-
-              {/* Verify button */}
-              <button
-                onClick={handleOtpVerify}
-                disabled={otpLoading || otpDigits.join('').length < 6 || otpExpiry === 0}
-                className="w-full rounded-xl bg-blue-800 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700 dark:bg-amber-600 dark:text-slate-900 dark:hover:bg-amber-500 transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {otpLoading ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" /><span>Verifying...</span></>
-                ) : (
-                  <><ShieldCheck className="h-4 w-4" /><span>Verify & Sign In</span></>
-                )}
-              </button>
-
-              {/* Resend + Back */}
-              <div className="flex items-center justify-between text-xs">
-                <button
-                  onClick={() => {
-                    setOtpStep(false);
-                    setOtpDigits(['', '', '', '', '', '']);
-                    setOtpError('');
-                  }}
-                  className="flex items-center gap-1 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  <span>Back to Login</span>
-                </button>
-                <button
-                  onClick={handleResendOtp}
-                  disabled={resendCooldown > 0 || otpLoading}
-                  className={`flex items-center gap-1 font-semibold transition-colors cursor-pointer ${
-                    resendCooldown > 0
-                      ? 'text-slate-400 cursor-not-allowed'
-                      : 'text-blue-700 hover:text-blue-600 dark:text-amber-400 dark:hover:text-amber-300'
-                  }`}
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  <span>{resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Branding footer */}
-          <div className="flex items-center justify-center gap-2 mt-6">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-800 text-amber-500">
-              <Hotel className="h-4 w-4" />
-            </div>
-            <span className="font-bold text-white text-sm">
-              Hospi<span className="text-amber-500">Hire</span>
-            </span>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // ── LOGIN SCREEN ─────────────────────────────────────────────────────────────
   return (
