@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Lock, Mail, Hotel, Check, Eye, EyeOff, Loader2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Lock, Mail, Hotel, Check, Eye, EyeOff, Loader2, ShieldCheck, RotateCcw, ArrowLeft } from 'lucide-react';
 
 export default function Login({ onAuthSuccess, setCurrentPage }) {
   const [emailOrPhone, setEmailOrPhone] = useState('');
@@ -9,48 +9,232 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  // OTP state
+  const [otpStep, setOtpStep] = useState(false);         // true = show OTP screen
+  const [otpToken, setOtpToken] = useState('');           // short-lived JWT from backend
+  const [otpEmail, setOtpEmail] = useState('');           // email to show user
+  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
+  const [otpError, setOtpError] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0); // seconds
+  const [otpExpiry, setOtpExpiry] = useState(600);        // 10 minutes in seconds
+  const otpRefs = useRef([]);
+  const resendTimerRef = useRef(null);
+  const expiryTimerRef = useRef(null);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (resendTimerRef.current) clearInterval(resendTimerRef.current);
+      if (expiryTimerRef.current) clearInterval(expiryTimerRef.current);
+    };
+  }, []);
+
+  const startOtpTimers = () => {
+    // Resend cooldown: 60 seconds
+    setResendCooldown(60);
+    if (resendTimerRef.current) clearInterval(resendTimerRef.current);
+    resendTimerRef.current = setInterval(() => {
+      setResendCooldown(prev => {
+        if (prev <= 1) { clearInterval(resendTimerRef.current); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // OTP expiry: 10 minutes
+    setOtpExpiry(600);
+    if (expiryTimerRef.current) clearInterval(expiryTimerRef.current);
+    expiryTimerRef.current = setInterval(() => {
+      setOtpExpiry(prev => {
+        if (prev <= 1) { clearInterval(expiryTimerRef.current); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const maskEmail = (email) => {
+    if (!email) return '';
+    const [user, domain] = email.split('@');
+    if (!domain) return email;
+    const masked = user.length > 2
+      ? user[0] + '•'.repeat(user.length - 2) + user[user.length - 1]
+      : user[0] + '•';
+    return `${masked}@${domain}`;
+  };
+
+  const formatTime = (secs) => {
+    const m = Math.floor(secs / 60).toString().padStart(2, '0');
+    const s = (secs % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
+  // Handle OTP digit input
+  const handleOtpChange = (idx, val) => {
+    const digit = val.replace(/\D/g, '').slice(-1);
+    const next = [...otpDigits];
+    next[idx] = digit;
+    setOtpDigits(next);
+    setOtpError('');
+    if (digit && idx < 5) {
+      otpRefs.current[idx + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (idx, e) => {
+    if (e.key === 'Backspace' && !otpDigits[idx] && idx > 0) {
+      otpRefs.current[idx - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e) => {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pasted.length === 6) {
+      setOtpDigits(pasted.split(''));
+      otpRefs.current[5]?.focus();
+    }
     e.preventDefault();
-    if (!emailOrPhone || !password) {
-      setError('Please enter your email/phone and password.');
+  };
+
+  // Submit OTP
+  const handleOtpVerify = async () => {
+    const code = otpDigits.join('');
+    if (code.length < 6) {
+      setOtpError('Please enter all 6 digits.');
       return;
     }
-    
-    setLoading(true);
-    setError('');
-    
+    if (otpExpiry === 0) {
+      setOtpError('OTP has expired. Please log in again.');
+      return;
+    }
+    setOtpLoading(true);
+    setOtpError('');
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ otp_token: otpToken, otp_code: code })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await onAuthSuccess(data.token, data.user);
+        if (data.user.role === 'admin') setCurrentPage('admin-dashboard');
+        else if (data.user.role === 'recruiter') setCurrentPage('recruiter-dashboard');
+        else setCurrentPage('student-dashboard');
+      } else {
+        setOtpError(data.detail || 'Invalid OTP. Please try again.');
+        setOtpDigits(['', '', '', '', '', '']);
+        otpRefs.current[0]?.focus();
+      }
+    } catch {
+      setOtpError('Connection error. Please try again.');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  // Resend OTP
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0) return;
+    setOtpLoading(true);
+    setOtpError('');
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ emailOrPhone, password })
       });
-      
       const data = await res.json();
-      
-      if (res.ok) {
-        // Authenticated successfully
-        await onAuthSuccess(data.token, data.user);
-        
-        // Navigation route based on role
-        if (data.user.role === 'admin') setCurrentPage('admin-dashboard');
-        else if (data.user.role === 'recruiter') setCurrentPage('recruiter-dashboard');
-        else setCurrentPage('student-dashboard');
+      if (res.ok && data.requires_otp) {
+        setOtpToken(data.otp_token);
+        setOtpDigits(['', '', '', '', '', '']);
+        startOtpTimers();
+        otpRefs.current[0]?.focus();
       } else {
-        setError(data.message || 'Invalid credentials.');
+        setOtpError('Could not resend OTP. Please go back and try again.');
+      }
+    } catch {
+      setOtpError('Connection error. Please try again.');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!emailOrPhone || !password) {
+      setError('Please enter your email/phone and password.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    let loginInput = emailOrPhone.trim();
+    
+    // Auto-prepend 91 if user entered exactly 10 digits
+    if (/^\d{10}$/.test(loginInput)) {
+      loginInput = '91' + loginInput;
+    }
+
+    const isEmail = loginInput.includes('@');
+    if (isEmail) {
+      const allowedDomains = ['@gmail.com', '@cornell.edu', '@marriott.com', '@hospihire.com'];
+      const matchesAllowed = allowedDomains.some(dom => loginInput.endsWith(dom));
+      if (!matchesAllowed || !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(loginInput)) {
+        setError('Please enter a valid Gmail address ending in @gmail.com.');
+        setLoading(false);
+        return;
+      }
+    } else {
+      // Clean other characters like spaces, dashes, etc.
+      const phoneCleaned = loginInput.replace(/[\s\-\+\(\)]/g, '');
+      if (!/^91\d{10}$/.test(phoneCleaned)) {
+        setError('Please enter a valid 10-digit phone number or Gmail address.');
+        setLoading(false);
+        return;
+      }
+      loginInput = phoneCleaned;
+    }
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emailOrPhone: loginInput, password })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        if (data.requires_otp) {
+          // Step 2: Show OTP screen
+          setOtpToken(data.otp_token);
+          setOtpEmail(data.email || loginInput);
+          setOtpStep(true);
+          startOtpTimers();
+          setTimeout(() => otpRefs.current[0]?.focus(), 100);
+        } else {
+          // Direct login (fallback if OTP somehow bypassed)
+          await onAuthSuccess(data.token, data.user);
+          if (data.user.role === 'admin') setCurrentPage('admin-dashboard');
+          else if (data.user.role === 'recruiter') setCurrentPage('recruiter-dashboard');
+          else setCurrentPage('student-dashboard');
+        }
+      } else {
+        setError(data.detail || data.message || 'Invalid credentials.');
       }
     } catch (err) {
       console.error('Auth API Connection error:', err);
-      setError('Backend server is offline. To test the dashboard without setting up PostgreSQL, please click one of the quick simulation login buttons below.');
+      setError('Backend server is offline. Use the quick simulation login buttons below to test.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Fail-Safe Fallback: Signs in using mock data if the DB server is offline or unseeded
+  // Fail-Safe Fallback (no OTP — simulation only)
   const useMockFallback = async (role) => {
-    console.warn(`Database connection failed or user not seeded. Logging in as simulated ${role} in frontend memory...`);
-    
+    console.warn(`[SIMULATION] Logging in as mock ${role}...`);
+
     let mockUser = {};
     const mockToken = 'mock-jwt-token-hospihire-simulation';
 
@@ -90,24 +274,20 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
     }
 
     await onAuthSuccess(mockToken, mockUser);
-    
     if (role === 'admin') setCurrentPage('admin-dashboard');
     else if (role === 'recruiter') setCurrentPage('recruiter-dashboard');
     else setCurrentPage('student-dashboard');
   };
 
+  // Quick login — SKIPS OTP
   const handleQuickLogin = async (role) => {
     setLoading(true);
     setError('');
-    
+
     let credentials = { emailOrPhone: '', password: '' };
-    if (role === 'student') {
-      credentials = { emailOrPhone: 'student@cornell.edu', password: 'password123' };
-    } else if (role === 'recruiter') {
-      credentials = { emailOrPhone: 'recruiter@marriott.com', password: 'recruiter123' };
-    } else {
-      credentials = { emailOrPhone: 'admin@hospihire.com', password: 'admin123' };
-    }
+    if (role === 'student') credentials = { emailOrPhone: 'student@cornell.edu', password: 'password123' };
+    else if (role === 'recruiter') credentials = { emailOrPhone: 'recruiter@marriott.com', password: 'recruiter123' };
+    else credentials = { emailOrPhone: 'admin@hospihire.com', password: 'admin123' };
 
     try {
       const res = await fetch('/api/auth/login', {
@@ -115,31 +295,154 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(credentials)
       });
-      
       const data = await res.json();
-      
+
       if (res.ok) {
-        await onAuthSuccess(data.token, data.user);
-        if (data.user.role === 'admin') setCurrentPage('admin-dashboard');
-        else if (data.user.role === 'recruiter') setCurrentPage('recruiter-dashboard');
-        else setCurrentPage('student-dashboard');
+        // Quick login bypasses OTP — use the OTP token to auto-verify a known code approach
+        // Instead we just fetch profile directly via a simulation:
+        // We treat quick logins as simulation and use mock fallback
+        await useMockFallback(role);
       } else {
-        // Credentials don't match (e.g. database exists but seed wasn't run)
-        console.warn('DB returns invalid credentials for quick login. Bypassing with fallback...');
         await useMockFallback(role);
       }
-    } catch (err) {
-      // Backend is offline
+    } catch {
       await useMockFallback(role);
     } finally {
       setLoading(false);
     }
   };
 
+  // ── OTP SCREEN ──────────────────────────────────────────────────────────────
+  if (otpStep) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-6">
+        <div className="w-full max-w-md">
+          {/* Card */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-200/10">
+            {/* Top accent bar */}
+            <div className="h-1.5 w-full bg-gradient-to-r from-blue-800 via-blue-600 to-amber-500" />
+
+            <div className="p-8 flex flex-col gap-6">
+              {/* Icon + Heading */}
+              <div className="flex flex-col items-center gap-3 text-center">
+                <div className="h-16 w-16 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 flex items-center justify-center">
+                  <ShieldCheck className="h-8 w-8 text-blue-700 dark:text-blue-400" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-extrabold text-slate-900 dark:text-white">Verify Your Identity</h1>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    We sent a 6-digit code to
+                  </p>
+                  <p className="text-sm font-semibold text-blue-700 dark:text-amber-400 mt-0.5">
+                    {maskEmail(otpEmail)}
+                  </p>
+                </div>
+              </div>
+
+              {/* OTP Error */}
+              {otpError && (
+                <div className="p-3 text-xs rounded-xl bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/50 text-center">
+                  {otpError}
+                </div>
+              )}
+
+              {/* 6-digit input */}
+              <div className="flex gap-2 justify-center" onPaste={handleOtpPaste}>
+                {otpDigits.map((digit, idx) => (
+                  <input
+                    key={idx}
+                    ref={el => (otpRefs.current[idx] = el)}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={e => handleOtpChange(idx, e.target.value)}
+                    onKeyDown={e => handleOtpKeyDown(idx, e)}
+                    className={`w-12 h-14 text-center text-xl font-bold rounded-xl border-2 outline-none transition-all
+                      ${digit
+                        ? 'border-blue-600 bg-blue-50 text-blue-800 dark:border-amber-500 dark:bg-amber-950/20 dark:text-amber-300'
+                        : 'border-slate-200 bg-slate-50 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white'
+                      }
+                      focus:border-blue-700 focus:ring-2 focus:ring-blue-200 dark:focus:border-amber-500 dark:focus:ring-amber-900/30`}
+                  />
+                ))}
+              </div>
+
+              {/* Expiry timer */}
+              <div className="text-center text-xs">
+                {otpExpiry > 0 ? (
+                  <span className="text-slate-500 dark:text-slate-400">
+                    Code expires in{' '}
+                    <span className={`font-bold ${otpExpiry < 60 ? 'text-red-500' : 'text-blue-700 dark:text-amber-400'}`}>
+                      {formatTime(otpExpiry)}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-red-500 font-semibold">Code has expired. Please log in again.</span>
+                )}
+              </div>
+
+              {/* Verify button */}
+              <button
+                onClick={handleOtpVerify}
+                disabled={otpLoading || otpDigits.join('').length < 6 || otpExpiry === 0}
+                className="w-full rounded-xl bg-blue-800 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700 dark:bg-amber-600 dark:text-slate-900 dark:hover:bg-amber-500 transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {otpLoading ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /><span>Verifying...</span></>
+                ) : (
+                  <><ShieldCheck className="h-4 w-4" /><span>Verify & Sign In</span></>
+                )}
+              </button>
+
+              {/* Resend + Back */}
+              <div className="flex items-center justify-between text-xs">
+                <button
+                  onClick={() => {
+                    setOtpStep(false);
+                    setOtpDigits(['', '', '', '', '', '']);
+                    setOtpError('');
+                  }}
+                  className="flex items-center gap-1 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  <span>Back to Login</span>
+                </button>
+                <button
+                  onClick={handleResendOtp}
+                  disabled={resendCooldown > 0 || otpLoading}
+                  className={`flex items-center gap-1 font-semibold transition-colors cursor-pointer ${
+                    resendCooldown > 0
+                      ? 'text-slate-400 cursor-not-allowed'
+                      : 'text-blue-700 hover:text-blue-600 dark:text-amber-400 dark:hover:text-amber-300'
+                  }`}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>{resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Branding footer */}
+          <div className="flex items-center justify-center gap-2 mt-6">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-800 text-amber-500">
+              <Hotel className="h-4 w-4" />
+            </div>
+            <span className="font-bold text-white text-sm">
+              Hospi<span className="text-amber-500">Hire</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── LOGIN SCREEN ─────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex items-stretch bg-white dark:bg-slate-950 transition-colors duration-300 relative">
-      
-      {/* 1. TOP FLOATING BRANDING BAR (Always Anchored) */}
+
+      {/* 1. TOP FLOATING BRANDING BAR */}
       <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-20 pointer-events-none">
         <div className="flex items-center gap-2 cursor-pointer pointer-events-auto" onClick={() => setCurrentPage('home')}>
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-800 dark:bg-amber-600 text-amber-500 dark:text-slate-900 shadow-sm">
@@ -151,7 +454,7 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
         </div>
       </div>
 
-      {/* 2. LEFT PANEL (Visual Desktop Cover) */}
+      {/* 2. LEFT PANEL */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-slate-900 overflow-hidden flex-col justify-between p-12 text-white">
         <div className="absolute inset-0 z-0">
           <img
@@ -159,7 +462,7 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
             alt="Luxury Hospitality"
             className="w-full h-full object-cover opacity-20"
           />
-          <div className="absolute inset-0 bg-gradient-to-tr from-slate-955 via-slate-900/90 to-blue-955/40"></div>
+          <div className="absolute inset-0 bg-gradient-to-tr from-slate-950 via-slate-900/90 to-blue-950/40"></div>
         </div>
 
         <div className="relative z-10 flex-grow flex flex-col justify-center max-w-md mt-16">
@@ -167,7 +470,7 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
           <h2 className="font-display text-3xl sm:text-4xl font-extrabold leading-tight mt-3">
             Where Hospitality Service Meets Global Opportunity
           </h2>
-          <p className="text-slate-305 mt-4 text-sm leading-relaxed">
+          <p className="text-slate-300 mt-4 text-sm leading-relaxed">
             Access direct applications to international hotel brands, structure your academic achievements, and schedule verified interviews.
           </p>
 
@@ -181,7 +484,7 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
                 <div className="h-5 w-5 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500 flex-shrink-0">
                   <Check className="h-3.5 w-3.5" />
                 </div>
-                <span className="text-slate-355">{item}</span>
+                <span className="text-slate-300">{item}</span>
               </div>
             ))}
           </div>
@@ -192,24 +495,23 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
         </div>
       </div>
 
-      {/* 3. RIGHT PANEL (Auth Form) */}
+      {/* 3. RIGHT PANEL */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 md:p-16 pt-24 lg:pt-16">
         <div className="w-full max-w-md flex flex-col gap-6">
-          
+
           <div className="flex flex-col gap-2 mt-4">
-            <h1 className="font-display text-2xl font-extrabold text-slate-955 dark:text-white">Welcome to HospiHire</h1>
+            <h1 className="font-display text-2xl font-extrabold text-slate-950 dark:text-white">Welcome to HospiHire</h1>
             <p className="text-slate-500 dark:text-slate-400 text-xs">
               Find hospitality jobs, internships, and career opportunities across world-class hotels.
             </p>
           </div>
 
-          {/* Social Sign-In Triggers */}
+          {/* Social Sign-In Triggers (Quick Login) */}
           <div className="flex flex-col sm:flex-row gap-3">
-            {/* Google Login */}
             <button
               type="button"
               onClick={() => handleQuickLogin('student')}
-              className="flex-1 flex items-center justify-center gap-2.5 rounded-xl border border-slate-205 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-850 cursor-pointer shadow-sm transition-all"
+              className="flex-1 flex items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-850 cursor-pointer shadow-sm transition-all"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -220,7 +522,6 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
               <span>Sign in with Google</span>
             </button>
 
-            {/* Apple Login */}
             <button
               type="button"
               onClick={() => handleQuickLogin('recruiter')}
@@ -235,18 +536,18 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
 
           {/* Divider */}
           <div className="flex items-center my-1">
-            <div className="flex-grow border-t border-slate-205 dark:border-slate-850"></div>
+            <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
             <span className="mx-4 text-xs text-slate-400 font-semibold uppercase tracking-wider">or</span>
-            <div className="flex-grow border-t border-slate-205 dark:border-slate-850"></div>
+            <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {error && (
-              <div className="p-3 text-xs rounded-xl bg-red-50 text-red-750 border border-red-250 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/50">
+              <div className="p-3 text-xs rounded-xl bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/50">
                 {error}
               </div>
             )}
-            
+
             <div className="flex flex-col gap-1.5">
               <label htmlFor="emailOrPhone" className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Email or Phone</label>
               <div className="relative">
@@ -256,10 +557,7 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
                   id="emailOrPhone"
                   required
                   value={emailOrPhone}
-                  onChange={(e) => {
-                    setEmailOrPhone(e.target.value);
-                    setError('');
-                  }}
+                  onChange={e => { setEmailOrPhone(e.target.value); setError(''); }}
                   placeholder="name@hotel.edu or +1..."
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-955 dark:text-white dark:focus:border-amber-500"
                 />
@@ -267,9 +565,7 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <div className="flex justify-between items-center">
-                <label htmlFor="password" className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Password</label>
-              </div>
+              <label htmlFor="password" className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
@@ -277,17 +573,14 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
                   id="password"
                   required
                   value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setError('');
-                  }}
+                  onChange={e => { setPassword(e.target.value); setError(''); }}
                   placeholder="••••••••"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-955 dark:text-white dark:focus:border-amber-500"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-450 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -299,12 +592,12 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
                 <input
                   type="checkbox"
                   checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="rounded border-slate-300 text-blue-805 focus:ring-blue-800 dark:border-slate-800 dark:bg-slate-955 dark:focus:ring-amber-500 accent-blue-800 dark:accent-amber-500"
+                  onChange={e => setRememberMe(e.target.checked)}
+                  className="rounded border-slate-300 accent-blue-800 dark:accent-amber-500"
                 />
                 <span>Remember me</span>
               </label>
-              <a href="#" className="font-semibold text-blue-850 hover:text-blue-700 dark:text-amber-500 dark:hover:text-amber-400">Forgot Password?</a>
+              <a href="#" className="font-semibold text-blue-800 hover:text-blue-700 dark:text-amber-500 dark:hover:text-amber-400">Forgot Password?</a>
             </div>
 
             <button
@@ -313,10 +606,7 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
               className="w-full rounded-xl bg-blue-800 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700 dark:bg-amber-600 dark:text-slate-900 dark:hover:bg-amber-500 transition-all shadow-md mt-2 cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
               {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Verifying Credentials...</span>
-                </>
+                <><Loader2 className="h-4 w-4 animate-spin" /><span>Verifying Credentials...</span></>
               ) : (
                 <span>Continue</span>
               )}
@@ -325,30 +615,18 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
 
           {/* Quick Simulation Help */}
           <div className="p-3.5 rounded-2xl bg-amber-50/50 border border-amber-200/50 dark:bg-slate-900/60 dark:border-amber-600/20 flex flex-col gap-2">
-            <span className="text-[10px] font-bold text-amber-800 dark:text-amber-500 uppercase tracking-wider">Quick Simulation Login (One-click Testing)</span>
+            <span className="text-[10px] font-bold text-amber-800 dark:text-amber-500 uppercase tracking-wider">Quick Simulation Login (Skips OTP)</span>
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('student')}
-                disabled={loading}
-                className="flex-1 rounded-xl bg-blue-850 text-white dark:bg-slate-800 dark:text-amber-500 dark:hover:bg-slate-700 py-1.5 text-xs font-semibold hover:bg-blue-700 transition-all cursor-pointer shadow-sm text-center disabled:opacity-50"
-              >
+              <button type="button" onClick={() => handleQuickLogin('student')} disabled={loading}
+                className="flex-1 rounded-xl bg-blue-800 text-white dark:bg-slate-800 dark:text-amber-500 dark:hover:bg-slate-700 py-1.5 text-xs font-semibold hover:bg-blue-700 transition-all cursor-pointer shadow-sm text-center disabled:opacity-50">
                 Student
               </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('recruiter')}
-                disabled={loading}
-                className="flex-1 rounded-xl bg-amber-600 text-slate-900 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700 py-1.5 text-xs font-semibold hover:bg-amber-500 transition-all cursor-pointer shadow-sm text-center disabled:opacity-50"
-              >
+              <button type="button" onClick={() => handleQuickLogin('recruiter')} disabled={loading}
+                className="flex-1 rounded-xl bg-amber-600 text-slate-900 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700 py-1.5 text-xs font-semibold hover:bg-amber-500 transition-all cursor-pointer shadow-sm text-center disabled:opacity-50">
                 Hotel
               </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('admin')}
-                disabled={loading}
-                className="flex-1 rounded-xl bg-red-800 text-white dark:bg-slate-800 dark:text-red-400 dark:hover:bg-slate-700 py-1.5 text-xs font-semibold hover:bg-red-700 transition-all cursor-pointer shadow-sm text-center disabled:opacity-50"
-              >
+              <button type="button" onClick={() => handleQuickLogin('admin')} disabled={loading}
+                className="flex-1 rounded-xl bg-red-800 text-white dark:bg-slate-800 dark:text-red-400 dark:hover:bg-slate-700 py-1.5 text-xs font-semibold hover:bg-red-700 transition-all cursor-pointer shadow-sm text-center disabled:opacity-50">
                 Admin
               </button>
             </div>
@@ -356,17 +634,14 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
 
           <div className="text-center text-sm text-slate-500 dark:text-slate-400">
             Don't have an account?{' '}
-            <button
-              onClick={() => setCurrentPage('register')}
-              className="font-semibold text-blue-800 hover:text-blue-700 dark:text-amber-500 dark:hover:text-amber-400 cursor-pointer"
-            >
+            <button onClick={() => setCurrentPage('register')}
+              className="font-semibold text-blue-800 hover:text-blue-700 dark:text-amber-500 dark:hover:text-amber-400 cursor-pointer">
               Sign Up
             </button>
           </div>
 
         </div>
       </div>
-
     </div>
   );
 }
