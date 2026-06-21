@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, Users, Briefcase, Settings, CheckCircle2, XCircle, Trash2, Calendar, ShieldAlert, Award, FileSpreadsheet, Loader2 } from 'lucide-react';
 
-export default function AdminDashboard({ user, setCurrentPage }) {
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'users', 'jobs', 'settings'
+export default function AdminDashboard({ user, setCurrentPage, currentPage }) {
+  // Map global routes to local tab identifiers
+  const activeTab = 
+    currentPage === 'admin-dashboard' ? 'dashboard' :
+    currentPage === 'manage-users' ? 'users' :
+    currentPage === 'audit-jobs' ? 'jobs' :
+    currentPage;
+    
   const [stats, setStats] = useState({ totalUsers: 0, totalStudents: 0, totalRecruiters: 0, totalJobs: 0, totalApplications: 0 });
   const [usersList, setUsersList] = useState([]);
   const [jobsList, setJobsList] = useState([]);
@@ -99,61 +105,12 @@ export default function AdminDashboard({ user, setCurrentPage }) {
     }
   };
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
-    { id: 'users', label: 'Manage Users', icon: Users, badge: usersList.length },
-    { id: 'jobs', label: 'Audit Jobs', icon: Briefcase, badge: jobsList.length },
-    { id: 'settings', label: 'Settings', icon: Settings }
-  ];
-
-  if (loading) {
-    return (
-      <div className="flex h-96 w-full items-center justify-center text-slate-500">
-        <Loader2 className="h-8 w-8 animate-spin mr-3 text-amber-500" />
-        <span>Loading Admin Workspace...</span>
-      </div>
-    );
-  }
-
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 bg-white dark:bg-slate-950 transition-colors duration-300">
-      <div className="flex flex-col lg:flex-row gap-8">
+      <div className="flex flex-col gap-6">
         
-        {/* SIDEBAR */}
-        <aside className="w-full lg:w-64 flex-shrink-0">
-          <div className="glass-panel p-4 rounded-3xl border border-slate-100 dark:border-slate-850 flex flex-row lg:flex-col gap-1.5 overflow-x-auto lg:overflow-x-visible">
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              const isSelected = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer whitespace-nowrap lg:w-full ${
-                    isSelected
-                      ? 'bg-blue-800 text-white dark:bg-amber-600 dark:text-slate-900'
-                      : 'text-slate-655 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-900 hover:text-slate-900'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon className="h-4.5 w-4.5 flex-shrink-0" />
-                    <span>{item.label}</span>
-                  </div>
-                  {item.badge !== undefined && item.badge > 0 && (
-                    <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-bold ${
-                      isSelected ? 'bg-white text-blue-800 dark:bg-slate-900 dark:text-amber-500' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                    }`}>
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </aside>
-
         {/* MAIN PANEL CONTENT */}
-        <main className="flex-grow">
+        <main className="flex-grow w-full">
           {activeTab === 'dashboard' && (
             <div className="flex flex-col gap-6">
               
@@ -193,7 +150,7 @@ export default function AdminDashboard({ user, setCurrentPage }) {
                 <div className="p-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-850 rounded-3xl flex flex-col">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="font-display text-sm font-bold text-slate-950 dark:text-white">Recent Registrations</h3>
-                    <button onClick={() => setActiveTab('users')} className="text-xs font-semibold text-blue-800 dark:text-amber-500 hover:underline">View All</button>
+                    <button onClick={() => setCurrentPage('manage-users')} className="text-xs font-semibold text-blue-800 dark:text-amber-500 hover:underline">View All</button>
                   </div>
                   
                   <div className="flex flex-col gap-3">
@@ -216,8 +173,8 @@ export default function AdminDashboard({ user, setCurrentPage }) {
                 {/* Platform Jobs preview */}
                 <div className="p-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-850 rounded-3xl flex flex-col">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-display text-sm font-bold text-slate-950 dark:text-white">Recent Vacancies</h3>
-                    <button onClick={() => setActiveTab('jobs')} className="text-xs font-semibold text-blue-800 dark:text-amber-500 hover:underline">Manage</button>
+                    <h3 className="font-display text-sm font-bold text-slate-950 dark:text-white">Recent Postings</h3>
+                    <button onClick={() => setCurrentPage('audit-jobs')} className="text-xs font-semibold text-blue-800 dark:text-amber-500 hover:underline">Manage</button>
                   </div>
 
                   <div className="flex flex-col gap-3">

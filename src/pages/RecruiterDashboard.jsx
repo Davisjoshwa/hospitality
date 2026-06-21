@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, PlusCircle, Briefcase, Users, UserCheck, Settings, Eye, Check, X, Calendar, Plus, FileText } from 'lucide-react';
 
-export default function RecruiterDashboard({ user, jobs, postJob, appliedJobs, savedJobs, setCurrentPage }) {
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'post-job', 'jobs', 'applicants', 'settings'
+export default function RecruiterDashboard({ user, jobs, postJob, appliedJobs, savedJobs, setCurrentPage, currentPage }) {
+  // Map global routes to local tab identifiers
+  const activeTab = 
+    currentPage === 'recruiter-dashboard' ? 'dashboard' :
+    currentPage === 'manage-jobs' ? 'jobs' :
+    currentPage;
+    
   const [recruiterApplicants, setRecruiterApplicants] = useState([]);
   
   // Job Post State
@@ -80,57 +85,15 @@ export default function RecruiterDashboard({ user, jobs, postJob, appliedJobs, s
 
     setTimeout(() => {
       setPostedSuccess(false);
-      setActiveTab('dashboard');
+      setCurrentPage('recruiter-dashboard');
     }, 2000);
   };
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'post-job', label: 'Post a Job', icon: PlusCircle },
-    { id: 'jobs', label: 'Manage Jobs', icon: Briefcase },
-    { id: 'applicants', label: 'Applicants', icon: Users, badge: recruiterApplicants.length },
-    { id: 'settings', label: 'Settings', icon: Settings }
-  ];
-
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 bg-white dark:bg-slate-950 transition-colors duration-300">
-      <div className="flex flex-col lg:flex-row gap-8">
-        
-        {/* SIDEBAR NAVIGATION */}
-        <aside className="w-full lg:w-64 flex-shrink-0">
-          <div className="glass-panel p-4 rounded-3xl border border-slate-100 dark:border-slate-850 flex flex-row lg:flex-col gap-1.5 overflow-x-auto lg:overflow-x-visible">
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              const isSelected = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer whitespace-nowrap lg:w-full ${
-                    isSelected
-                      ? 'bg-blue-800 text-white dark:bg-amber-600 dark:text-slate-900'
-                      : 'text-slate-650 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-900 hover:text-slate-900'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon className="h-4.5 w-4.5 flex-shrink-0" />
-                    <span>{item.label}</span>
-                  </div>
-                  {item.badge !== undefined && item.badge > 0 && (
-                    <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-bold ${
-                      isSelected ? 'bg-white text-blue-800 dark:bg-slate-900 dark:text-amber-500' : 'bg-red-500 text-white'
-                    }`}>
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </aside>
-
+      <div className="flex flex-col gap-6">
         {/* MAIN PANEL CONTENT */}
-        <main className="flex-grow">
+        <main className="flex-grow w-full">
           {activeTab === 'dashboard' && (
             <div className="flex flex-col gap-6">
               
@@ -141,7 +104,7 @@ export default function RecruiterDashboard({ user, jobs, postJob, appliedJobs, s
                   <h1 className="font-display text-2xl font-extrabold text-slate-950 dark:text-white mt-1">Recruitment Workspace</h1>
                 </div>
                 <button
-                  onClick={() => setActiveTab('post-job')}
+                  onClick={() => setCurrentPage('post-job')}
                   className="rounded-xl bg-blue-800 hover:bg-blue-755 text-white dark:bg-amber-600 dark:text-slate-900 dark:hover:bg-amber-505 px-4 py-2.5 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow"
                 >
                   <Plus className="h-4 w-4" />
@@ -179,7 +142,7 @@ export default function RecruiterDashboard({ user, jobs, postJob, appliedJobs, s
                 <div className="lg:col-span-7 p-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-850 rounded-3xl flex flex-col">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="font-display text-base font-bold text-slate-950 dark:text-white">Active Applicants</h3>
-                    <button onClick={() => setActiveTab('applicants')} className="text-xs font-semibold text-blue-800 dark:text-amber-500 hover:underline">View All</button>
+                    <button onClick={() => setCurrentPage('applicants')} className="text-xs font-semibold text-blue-800 dark:text-amber-500 hover:underline">View All</button>
                   </div>
 
                   {recruiterApplicants.length > 0 ? (
@@ -205,7 +168,7 @@ export default function RecruiterDashboard({ user, jobs, postJob, appliedJobs, s
                           <div className="flex justify-between items-center border-t border-slate-200/50 dark:border-slate-850 pt-2.5 mt-1 text-[10px]">
                             <span className="text-slate-400">Email: {app.candidateEmail}</span>
                             <button
-                              onClick={() => setActiveTab('applicants')}
+                              onClick={() => setCurrentPage('applicants')}
                               className="font-bold text-blue-850 dark:text-amber-500 hover:underline"
                             >
                               Review Portfolio
@@ -226,7 +189,7 @@ export default function RecruiterDashboard({ user, jobs, postJob, appliedJobs, s
                 <div className="lg:col-span-5 p-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-850 rounded-3xl flex flex-col">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="font-display text-base font-bold text-slate-950 dark:text-white">Active Positions</h3>
-                    <button onClick={() => setActiveTab('jobs')} className="text-xs font-semibold text-blue-850 dark:text-amber-550 hover:underline">Manage</button>
+                    <button onClick={() => setCurrentPage('manage-jobs')} className="text-xs font-semibold text-blue-850 dark:text-amber-550 hover:underline">Manage</button>
                   </div>
 
                   <div className="flex flex-col gap-3">
@@ -392,7 +355,7 @@ export default function RecruiterDashboard({ user, jobs, postJob, appliedJobs, s
               <div className="flex justify-between items-center mb-6">
                 <h2 className="font-display text-xl font-bold text-slate-950 dark:text-white">Manage Vacancies</h2>
                 <button
-                  onClick={() => setActiveTab('post-job')}
+                  onClick={() => setCurrentPage('post-job')}
                   className="rounded-xl border border-slate-200 text-slate-700 dark:border-slate-800 dark:text-slate-350 px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-850"
                 >
                   Post New

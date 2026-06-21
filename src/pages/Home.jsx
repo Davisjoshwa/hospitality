@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ArrowRight, Users, Building, Briefcase, UserCheck, CheckCircle2, ChevronLeft, ChevronRight, Star, Quote } from 'lucide-react';
 import { topEmployers, testimonials } from '../mockData';
 
-export default function Home({ setCurrentPage, jobs, applyToJob, appliedJobs }) {
+export default function Home({ setCurrentPage, jobs, applyToJob, appliedJobs, user }) {
   const [activeTestimonial, setActiveTestimonial] = useState(0);
 
   const stats = [
@@ -24,7 +24,7 @@ export default function Home({ setCurrentPage, jobs, applyToJob, appliedJobs }) 
   const featuredJobs = jobs.slice(0, 3);
 
   return (
-    <div className="flex flex-col w-full bg-white dark:bg-slate-950 transition-colors duration-300">
+    <div className="flex flex-col w-full bg-white dark:bg-slate-950 transition-colors duration-150 transform-gpu">
       
       {/* 1. HERO SECTION */}
       <section className="relative overflow-hidden pt-16 pb-20 sm:pt-24 sm:pb-28 lg:pt-32 lg:pb-36 bg-slate-50 dark:bg-slate-900/40">
@@ -47,19 +47,23 @@ export default function Home({ setCurrentPage, jobs, applyToJob, appliedJobs }) 
           </p>
           
           <div className="mt-10 flex flex-col sm:flex-row justify-center gap-4">
-            <button
-              onClick={() => setCurrentPage('jobs')}
-              className="flex items-center justify-center gap-2 rounded-xl bg-blue-800 px-6 py-3.5 text-base font-semibold text-white hover:bg-blue-700 dark:bg-amber-600 dark:text-slate-900 dark:hover:bg-amber-500 transition-all shadow-lg shadow-blue-800/10 dark:shadow-amber-600/10 cursor-pointer"
-            >
-              <span>Find Jobs</span>
-              <ArrowRight className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setCurrentPage('register')}
-              className="flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-base font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 transition-all cursor-pointer"
-            >
-              <span>Post a Job</span>
-            </button>
+            {(!user || user.role !== 'recruiter') && (
+              <button
+                onClick={() => setCurrentPage(user ? (user.role === 'student' ? 'student-dashboard' : 'jobs') : 'register')}
+                className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-800 to-blue-600 px-6 py-3.5 text-base font-semibold text-white hover:from-blue-700 hover:to-blue-500 hover:-translate-y-0.5 hover:scale-[1.02] active:scale-[0.98] transition-all duration-150 transform-gpu shadow-lg hover:shadow-xl hover:shadow-blue-600/20 shadow-blue-800/10 dark:from-amber-600 dark:to-amber-500 dark:text-slate-900 dark:hover:from-amber-500 dark:hover:to-amber-400 dark:hover:shadow-amber-500/20 cursor-pointer"
+              >
+                <span>Find Jobs</span>
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            )}
+            {(!user || user.role !== 'student') && (
+              <button
+                onClick={() => setCurrentPage(user ? (user.role === 'recruiter' ? 'post-job' : 'student-dashboard') : 'register-recruiter')}
+                className="flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-base font-semibold text-slate-700 hover:bg-slate-50 hover:-translate-y-0.5 hover:scale-[1.02] active:scale-[0.98] transition-all duration-150 transform-gpu shadow-sm hover:shadow-lg hover:shadow-slate-200/50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:shadow-slate-900/50 cursor-pointer"
+              >
+                <span>Post a Job</span>
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -93,8 +97,8 @@ export default function Home({ setCurrentPage, jobs, applyToJob, appliedJobs }) 
               <p className="text-slate-500 dark:text-slate-400 mt-2">Explore active positions in top global hotels and dining establishments.</p>
             </div>
             <button
-              onClick={() => setCurrentPage('jobs')}
-              className="mt-4 md:mt-0 flex items-center gap-1 text-sm font-semibold text-blue-800 hover:text-blue-700 dark:text-amber-500 dark:hover:text-amber-400 cursor-pointer"
+              onClick={() => setCurrentPage(user ? 'jobs' : 'register')}
+              className="mt-4 md:mt-0 flex items-center gap-1 text-sm font-semibold text-blue-800 hover:text-blue-600 dark:text-amber-500 dark:hover:text-amber-400 hover:scale-[1.05] active:scale-[0.95] transition-all duration-150 transform-gpu cursor-pointer"
             >
               <span>View All Jobs</span>
               <ArrowRight className="h-4 w-4" />
@@ -105,7 +109,7 @@ export default function Home({ setCurrentPage, jobs, applyToJob, appliedJobs }) 
             {featuredJobs.map((job) => {
               const isApplied = appliedJobs.includes(job.id);
               return (
-                <div key={job.id} className="group relative flex flex-col justify-between p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 hover:border-blue-200 dark:hover:border-slate-700 hover:shadow-xl hover:shadow-slate-100/50 dark:hover:shadow-none transition-all duration-300">
+                <div key={job.id} className="group relative flex flex-col justify-between p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 hover:border-blue-200 dark:hover:border-slate-700 hover:shadow-xl hover:shadow-slate-100/50 dark:hover:shadow-none transition-all duration-150 transform-gpu">
                   <div>
                     {/* Header */}
                     <div className="flex items-center justify-between gap-4 mb-4">
@@ -140,10 +144,10 @@ export default function Home({ setCurrentPage, jobs, applyToJob, appliedJobs }) 
                     <button
                       onClick={() => applyToJob(job.id)}
                       disabled={isApplied}
-                      className={`rounded-xl px-4 py-2 text-xs font-semibold transition-all cursor-pointer ${
+                      className={`rounded-xl px-4 py-2 text-xs font-semibold transition-all duration-150 transform-gpu cursor-pointer ${
                         isApplied 
                           ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 cursor-default border border-emerald-200/50 dark:border-emerald-900/30'
-                          : 'bg-blue-800 text-white hover:bg-blue-700 dark:bg-amber-600 dark:text-slate-900 dark:hover:bg-amber-500'
+                          : 'bg-gradient-to-r from-blue-800 to-blue-600 text-white hover:from-blue-700 hover:to-blue-500 hover:-translate-y-0.5 hover:scale-[1.02] active:scale-[0.98] shadow-md hover:shadow-lg dark:from-amber-600 dark:to-amber-500 dark:text-slate-900 dark:hover:from-amber-500 dark:hover:to-amber-400'
                       }`}
                     >
                       {isApplied ? 'Applied' : 'Apply Now'}
@@ -166,7 +170,7 @@ export default function Home({ setCurrentPage, jobs, applyToJob, appliedJobs }) 
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {topEmployers.map((emp) => (
-              <div key={emp.id} className="group relative overflow-hidden rounded-2xl border border-slate-100 dark:border-slate-800/80 hover:shadow-lg transition-all duration-300">
+              <div key={emp.id} className="group relative overflow-hidden rounded-2xl border border-slate-100 dark:border-slate-800/80 hover:shadow-lg transition-all duration-150 transform-gpu">
                 <div className="h-40 overflow-hidden relative">
                   <img
                     src={emp.image}
@@ -274,13 +278,13 @@ export default function Home({ setCurrentPage, jobs, applyToJob, appliedJobs }) 
             <div className="absolute right-4 bottom-4 flex gap-2">
               <button
                 onClick={prevTestimonial}
-                className="h-8 w-8 rounded-lg bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer shadow-sm"
+                className="h-8 w-8 rounded-lg bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-150 transform-gpu hover:scale-110 active:scale-90 cursor-pointer shadow-sm"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <button
                 onClick={nextTestimonial}
-                className="h-8 w-8 rounded-lg bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer shadow-sm"
+                className="h-8 w-8 rounded-lg bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-150 transform-gpu hover:scale-110 active:scale-90 cursor-pointer shadow-sm"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>

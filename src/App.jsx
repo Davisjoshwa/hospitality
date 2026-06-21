@@ -13,7 +13,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import Profile from './pages/Profile';
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState('login'); // Router state
+  const [currentPage, setCurrentPage] = useState('home'); // Router state
   const [jobs, setJobs] = useState([]);
   const [user, setUser] = useState(null); // Central user state
   const [appliedJobs, setAppliedJobs] = useState([]);
@@ -212,8 +212,29 @@ export default function App() {
     window.scrollTo(0, 0);
   }, [currentPage]);
 
+  // Helper: get the dashboard page for the current user
+  const getDashboardPage = () => {
+    if (!user) return 'home';
+    if (user.role === 'admin') return 'admin-dashboard';
+    if (user.role === 'recruiter') return 'recruiter-dashboard';
+    return 'student-dashboard';
+  };
+
   // Page Routing resolver
   const renderPage = () => {
+    // --- Route guards: redirect logged-in users away from public-only pages ---
+    if (user && ['login', 'register'].includes(currentPage)) {
+      // Use setTimeout to avoid state update during render
+      setTimeout(() => setCurrentPage(getDashboardPage()), 0);
+      return null;
+    }
+
+    // --- Route guards: redirect non-logged-in users away from dashboards ---
+    if (!user && ['student-dashboard', 'recruiter-dashboard', 'admin-dashboard', 'profile', 'applications', 'saved-jobs', 'notifications', 'post-job', 'manage-jobs', 'applicants', 'manage-users', 'audit-jobs', 'settings'].includes(currentPage)) {
+      setTimeout(() => setCurrentPage('login'), 0);
+      return null;
+    }
+
     switch (currentPage) {
       case 'home':
         return (
@@ -222,6 +243,7 @@ export default function App() {
             jobs={jobs}
             applyToJob={applyToJob}
             appliedJobs={appliedJobs}
+            user={user}
           />
         );
       case 'jobs':
@@ -250,15 +272,20 @@ export default function App() {
           />
         );
       case 'register':
+      case 'register-recruiter':
         return (
           <Register
             onAuthSuccess={handleAuthSuccess}
             setCurrentPage={setCurrentPage}
+            defaultRole={currentPage === 'register-recruiter' ? 'recruiter' : 'student'}
           />
         );
       case 'student-dashboard':
+      case 'applications':
+      case 'saved-jobs':
+      case 'notifications':
         if (!user || user.role !== 'student') {
-          setCurrentPage('login');
+          setTimeout(() => setCurrentPage('login'), 0);
           return null;
         }
         return (
@@ -267,38 +294,53 @@ export default function App() {
             jobs={jobs}
             appliedJobs={appliedJobs}
             savedJobs={savedJobs}
+            applyToJob={applyToJob}
             setCurrentPage={setCurrentPage}
+            currentPage={currentPage}
           />
         );
       case 'recruiter-dashboard':
+      case 'post-job':
+      case 'manage-jobs':
+      case 'applicants':
         if (!user || user.role !== 'recruiter') {
-          setCurrentPage('login');
-          return null;
+          if (currentPage === 'settings') {
+            // Pass through if they are another role trying to access settings
+          } else {
+            setTimeout(() => setCurrentPage('login'), 0);
+            return null;
+          }
+        } else {
+          return (
+            <RecruiterDashboard
+              user={user}
+              jobs={jobs}
+              postJob={postJob}
+              appliedJobs={appliedJobs}
+              savedJobs={savedJobs}
+              setCurrentPage={setCurrentPage}
+              currentPage={currentPage}
+            />
+          );
         }
-        return (
-          <RecruiterDashboard
-            user={user}
-            jobs={jobs}
-            postJob={postJob}
-            appliedJobs={appliedJobs}
-            savedJobs={savedJobs}
-            setCurrentPage={setCurrentPage}
-          />
-        );
       case 'admin-dashboard':
-        if (!user || user.role !== 'admin') {
-          setCurrentPage('login');
+      case 'manage-users':
+      case 'audit-jobs':
+      case 'settings':
+        if (!user) {
+          setTimeout(() => setCurrentPage('login'), 0);
           return null;
         }
         return (
           <AdminDashboard
             user={user}
             setCurrentPage={setCurrentPage}
+            currentPage={currentPage}
           />
         );
       case 'profile':
         if (!user || user.role !== 'student') {
-          setCurrentPage('login');
+          setTimeout(() => setCurrentPage('login'), 0);
           return null;
         }
         return (
@@ -308,19 +350,32 @@ export default function App() {
             setCurrentPage={setCurrentPage}
           />
         );
+      case 'settings': // This should ideally be caught by the above blocks if role checks pass
+        return null;
       default:
+        // Logged-in users go to their dashboard, others go to home
+        if (user) {
+          setTimeout(() => setCurrentPage(getDashboardPage()), 0);
+          return null;
+        }
         return (
           <Home
             setCurrentPage={setCurrentPage}
             jobs={jobs}
             applyToJob={applyToJob}
             appliedJobs={appliedJobs}
+            user={user}
           />
         );
     }
   };
 
   const isAuthPage = currentPage === 'login' || currentPage === 'register';
+  const isDashboardPage = ['student-dashboard', 'recruiter-dashboard', 'admin-dashboard', 'profile', 'applications', 'saved-jobs', 'notifications'].includes(currentPage);
+  const isLoggedIn = !!user;
+
+  // Show footer only on public pages when NOT logged in
+  const showFooter = !isAuthPage && !isLoggedIn;
 
   if (loading) {
     return (
@@ -349,7 +404,8 @@ export default function App() {
         />
       )}
       <div className="flex-grow">{renderPage()}</div>
-      {!isAuthPage && <Footer setCurrentPage={setCurrentPage} />}
+      {showFooter && <Footer setCurrentPage={setCurrentPage} />}
     </div>
   );
 }
+

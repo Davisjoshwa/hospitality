@@ -23,8 +23,8 @@ function usePasswordStrength(password) {
   }, [password]);
 }
 
-export default function Register({ onAuthSuccess, setCurrentPage }) {
-  const [role, setRole] = useState('student');
+export default function Register({ onAuthSuccess, setCurrentPage, defaultRole = 'student' }) {
+  const [role, setRole] = useState(defaultRole);
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
   const [location, setLocation] = useState('Orlando, FL');

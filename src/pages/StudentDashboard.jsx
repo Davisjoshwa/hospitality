@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
-import { LayoutDashboard, User, Briefcase, Bookmark, Bell, Settings, FileText, CheckCircle, Clock, Calendar, ArrowRight, ShieldCheck, ChevronRight } from 'lucide-react';
+import React from 'react';
+import { LayoutDashboard, User, Briefcase, Bookmark, Bell, Settings, FileText, CheckCircle, Clock, Calendar, ArrowRight, ShieldCheck, ChevronRight, Search } from 'lucide-react';
 
-export default function StudentDashboard({ user, jobs, appliedJobs, savedJobs, setCurrentPage }) {
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'applications', 'saved', 'notifications', 'settings'
+export default function StudentDashboard({ user, jobs, appliedJobs, savedJobs, setCurrentPage, currentPage }) {
+  // Map App.jsx routes to local tab identifiers
+  const activeTab = 
+    currentPage === 'student-dashboard' ? 'dashboard' :
+    currentPage === 'saved-jobs' ? 'saved' : 
+    currentPage;
 
   // Filter user's applied jobs
   const appliedJobsList = jobs.filter(j => appliedJobs.includes(j.id));
@@ -10,92 +14,14 @@ export default function StudentDashboard({ user, jobs, appliedJobs, savedJobs, s
   // Filter user's saved jobs
   const savedJobsList = jobs.filter(j => savedJobs.includes(j.id));
 
-  // Determine profile completion percentage
-  let profileCompletion = 30; // base (registered)
-  if (user.education) profileCompletion += 20;
-  if (user.skills && user.skills.length > 0) profileCompletion += 20;
-  if (user.internships && user.internships.length > 0) profileCompletion += 20;
-  if (user.certificates && user.certificates.length > 0) profileCompletion += 10;
-
-  // Sidebar items
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'profile', label: 'Profile', icon: User, action: () => setCurrentPage('profile') },
-    { id: 'applications', label: 'Applications', icon: Briefcase },
-    { id: 'saved', label: 'Saved Jobs', icon: Bookmark },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'settings', label: 'Settings', icon: Settings }
-  ];
-
-  const handleMenuClick = (item) => {
-    if (item.action) {
-      item.action();
-    } else {
-      setActiveTab(item.id);
-    }
-  };
-
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 bg-white dark:bg-slate-950 transition-colors duration-300">
-      <div className="flex flex-col lg:flex-row gap-8">
-        
-        {/* 1. SIDEBAR (Sticky Navigation) */}
-        <aside className="w-full lg:w-64 flex-shrink-0">
-          <div className="glass-panel p-4 rounded-3xl border border-slate-100 dark:border-slate-850 flex flex-row lg:flex-col gap-1.5 overflow-x-auto lg:overflow-x-visible">
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              const isSelected = item.action ? false : activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleMenuClick(item)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer whitespace-nowrap lg:w-full ${
-                    isSelected
-                      ? 'bg-blue-800 text-white dark:bg-amber-600 dark:text-slate-900'
-                      : 'text-slate-650 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-900 hover:text-slate-900'
-                  }`}
-                >
-                  <Icon className="h-4.5 w-4.5 flex-shrink-0" />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </aside>
-
-        {/* 2. MAIN CONTAINER */}
+      <div className="flex flex-col gap-6">
+        {/* MAIN CONTAINER */}
         <main className="flex-grow">
           {activeTab === 'dashboard' && (
             <div className="flex flex-col gap-6">
               
-              {/* Profile Completion banner & completion percentage */}
-              <div className="glass-panel p-6 rounded-3xl border border-slate-100 dark:border-slate-850 bg-gradient-to-r from-blue-50/50 to-indigo-50/20 dark:from-slate-900/40 dark:to-slate-900/20 flex flex-col md:flex-row gap-6 justify-between items-center">
-                <div className="flex flex-col gap-1 md:max-w-md text-center md:text-left">
-                  <span className="text-xs font-bold text-blue-800 dark:text-amber-500 uppercase tracking-wide">Academic Placement Profile</span>
-                  <h2 className="font-display text-xl font-extrabold text-slate-950 dark:text-white mt-1">Complete your HospiHire Profile</h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mt-1">
-                    Hiring managers prioritize students with complete details. Fill in your certificates and education.
-                  </p>
-                </div>
-                
-                {/* Progress Circle Mock */}
-                <div className="flex items-center gap-4 flex-shrink-0">
-                  <div className="relative h-16 w-16 flex items-center justify-center">
-                    <svg className="w-full h-full transform -rotate-90">
-                      <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4.5" fill="transparent" className="text-slate-200 dark:text-slate-800" />
-                      <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4.5" fill="transparent" strokeDasharray={175} strokeDashoffset={175 - (175 * profileCompletion) / 100} className="text-blue-800 dark:text-amber-500 transition-all duration-500" />
-                    </svg>
-                    <span className="absolute text-xs font-bold text-slate-800 dark:text-white">{profileCompletion}%</span>
-                  </div>
-                  <button
-                    onClick={() => setCurrentPage('profile')}
-                    className="rounded-xl bg-blue-800 hover:bg-blue-750 text-white dark:bg-amber-600 dark:text-slate-900 dark:hover:bg-amber-500 px-4 py-2.5 text-xs font-bold transition-all cursor-pointer shadow"
-                  >
-                    Edit Profile
-                  </button>
-                </div>
-              </div>
-
               {/* Stats Counters Grid */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
@@ -339,44 +265,6 @@ export default function StudentDashboard({ user, jobs, appliedJobs, savedJobs, s
             </div>
           )}
 
-          {activeTab === 'settings' && (
-            <div className="p-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-850 rounded-3xl flex flex-col">
-              <h2 className="font-display text-xl font-bold text-slate-950 dark:text-white mb-6">Account Settings</h2>
-              
-              <div className="flex flex-col gap-6">
-                {/* Section */}
-                <div className="flex flex-col gap-4">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Alert Preferences</h3>
-                  <div className="flex flex-col gap-3">
-                    {[
-                      'Receive daily job recommendations matching your profile',
-                      'Email me when a recruiter views my digital resume',
-                      'Receive SMS alerts for scheduled virtual interviews'
-                    ].map((pref, i) => (
-                      <label key={i} className="flex items-center gap-3 text-sm text-slate-655 dark:text-slate-350 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          defaultChecked={i < 2}
-                          className="rounded border-slate-300 text-blue-805 focus:ring-blue-800 dark:border-slate-800 dark:bg-slate-950 dark:focus:ring-amber-500 accent-blue-800 dark:accent-amber-500"
-                        />
-                        <span>{pref}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <hr className="border-slate-100 dark:border-slate-800" />
-
-                {/* Account Actions */}
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Security & Session</h3>
-                  <button className="rounded-xl border border-slate-200 text-slate-700 px-4 py-2.5 text-xs font-semibold hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-850 transition-all cursor-pointer">
-                    Change Account Password
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </main>
 
       </div>
