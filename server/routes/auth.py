@@ -6,6 +6,7 @@ import jwt
 import os
 import re
 from passlib.hash import bcrypt
+from email_validator import validate_email, EmailNotValidError
 from db import execute_query
 from middleware.auth import get_current_user
 from utils.email import generate_otp, send_otp_email
@@ -15,20 +16,10 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 SECRET_KEY = os.getenv("JWT_SECRET") or "supersecretjwtkeyhospihire2026"
 
-# Password strength regex rules
-PASSWORD_RULES = [
-    (r'.{8,}',          'At least 8 characters'),
-    (r'[A-Z]',          'At least one uppercase letter'),
-    (r'[a-z]',          'At least one lowercase letter'),
-    (r'[0-9]',          'At least one number'),
-    (r'[!@#$%^&*(),.?":{}|<>_\-\[\]\\;\'\/`~+=]', 'At least one special character'),
-]
-
 def validate_password_strength(password: str) -> Optional[str]:
     """Returns an error message if password doesn't meet rules, else None."""
-    for pattern, msg in PASSWORD_RULES:
-        if not re.search(pattern, password):
-            return f"Password must contain: {msg}"
+    if len(password) < 6:
+        return "Password must be at least 6 characters long."
     return None
 
 def create_access_token(user_id: int, role: str):
@@ -74,6 +65,13 @@ class RegisterRequest(BaseModel):
     name: Optional[str] = None
     companyName: Optional[str] = None
     location: Optional[str] = None
+    school: Optional[str] = None
+    field_of_study: Optional[str] = None
+    start_year: Optional[int] = None
+    end_year: Optional[int] = None
+    age_over_16: Optional[bool] = None
+    job_title: Optional[str] = None
+    interests: Optional[str] = None
 
 class ProfileUpdateRequest(BaseModel):
     name: Optional[str] = None
@@ -88,6 +86,12 @@ class ProfileUpdateRequest(BaseModel):
     company: Optional[str] = None
     location: Optional[str] = None
     description: Optional[str] = None
+    school: Optional[str] = None
+    startYear: Optional[int] = None
+    endYear: Optional[int] = None
+    jobTitle: Optional[str] = None
+    avatar: Optional[str] = None
+    interests: Optional[str] = None
 
 # --- ENDPOINTS ---
 
@@ -98,16 +102,28 @@ def register(req: RegisterRequest):
     if role not in ["student", "recruiter"]:
         raise HTTPException(status_code=400, detail="Invalid registration role.")
 
-    if role == "student" and not req.name:
-        raise HTTPException(status_code=400, detail="Full name is required for students.")
+    # 1. Mail Condition
+    try:
+        email_info = validate_email(req.email, check_deliverability=True)
+        req.email = email_info.normalized
+    except EmailNotValidError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-    if role == "recruiter" and (not req.companyName or not req.location):
-        raise HTTPException(status_code=400, detail="Company name and location are required for hotel recruiters.")
+    # 2. Pass Condition
+    pwd_error = validate_password_strength(req.password)
+    if pwd_error:
+        raise HTTPException(status_code=400, detail=pwd_error)
 
-    # --- Server-side email domain validation ---
-    allowed_domains = ["@gmail.com", "@cornell.edu", "@marriott.com", "@hospihire.com"]
-    if not any(req.email.endswith(dom) for dom in allowed_domains):
-        raise HTTPException(status_code=400, detail="Only Gmail addresses ending in @gmail.com are supported.")
+    # 3. Name Condition
+    if role == "student":
+        if not req.name or len(req.name.strip().split()) < 2:
+            raise HTTPException(status_code=400, detail="For students, First and Last names are required.")
+    elif role == "recruiter":
+        if not req.companyName or not req.companyName.strip():
+            raise HTTPException(status_code=400, detail="Company Name is required for recruiters.")
+
+    if role == "recruiter" and not req.location:
+        raise HTTPException(status_code=400, detail="Location is required for hotel recruiters.")
 
     # --- Server-side phone validation and normalization ---
     if req.phone:
@@ -138,18 +154,18 @@ def register(req: RegisterRequest):
 
         if role == "student":
             res = execute_query(
-                """INSERT INTO students (email, phone, password_hash, name) 
-                   VALUES (%s, %s, %s, %s) RETURNING id""",
-                (req.email, req.phone, password_hash, req.name),
+                """INSERT INTO students (email, phone, password_hash, name, location, school, field_of_study, start_year, end_year, age_over_16, job_title, interests) 
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
+                (req.email, req.phone, password_hash, req.name, req.location, req.school, req.field_of_study, req.start_year, req.end_year, req.age_over_16, req.job_title, req.interests),
                 commit=True
             )
             user_id = res[0]["id"]
             profile_data = {"name": req.name}
         elif role == "recruiter":
             res = execute_query(
-                """INSERT INTO hotels (email, phone, password_hash, company_name, location, is_verified) 
-                   VALUES (%s, %s, %s, %s, %s, %s) RETURNING id""",
-                (req.email, req.phone, password_hash, req.companyName, req.location, True),
+                """INSERT INTO hotels (email, phone, password_hash, company_name, job_title, location, is_verified, interests) 
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
+                (req.email, req.phone, password_hash, req.companyName, req.job_title, req.location, True, req.interests),
                 commit=True
             )
             user_id = res[0]["id"]
@@ -231,7 +247,8 @@ def login(req: LoginRequest):
                 profile_details = {
                     "company": matched_user["company_name"],
                     "location": matched_user["location"],
-                    "description": matched_user.get("description")
+                    "description": matched_user.get("description"),
+                    "avatar": matched_user.get("avatar")
                 }
 
         # C. Query students
@@ -252,7 +269,13 @@ def login(req: LoginRequest):
                     "skills": matched_user.get("skills", []),
                     "internships": matched_user.get("internships", []),
                     "certificates": matched_user.get("certificates", []),
-                    "resumeName": matched_user.get("resume_name")
+                    "resumeName": matched_user.get("resume_name"),
+                    "school": matched_user.get("school"),
+                    "startYear": matched_user.get("start_year"),
+                    "endYear": matched_user.get("end_year"),
+                    "jobTitle": matched_user.get("job_title"),
+                    "location": matched_user.get("location"),
+                    "avatar": matched_user.get("avatar")
                 }
 
         if not matched_user:
@@ -405,7 +428,7 @@ def get_profile(current_user: dict = Depends(get_current_user)):
             profile_details = {"name": row["name"]}
 
         elif role == "recruiter":
-            res = execute_query("SELECT email, phone, company_name, location, description FROM hotels WHERE id = %s", (user_id,))
+            res = execute_query("SELECT email, phone, company_name, location, description, avatar, interests FROM hotels WHERE id = %s", (user_id,))
             if not res:
                 raise HTTPException(status_code=404, detail="Hotel profile not found.")
             row = res[0]
@@ -414,7 +437,9 @@ def get_profile(current_user: dict = Depends(get_current_user)):
             profile_details = {
                 "company": row["company_name"],
                 "location": row["location"],
-                "description": row.get("description")
+                "description": row.get("description"),
+                "avatar": row.get("avatar"),
+                "interests": row.get("interests")
             }
 
         elif role == "student":
@@ -433,7 +458,14 @@ def get_profile(current_user: dict = Depends(get_current_user)):
                 "skills": row.get("skills", []),
                 "internships": row.get("internships", []),
                 "certificates": row.get("certificates", []),
-                "resumeName": row.get("resume_name")
+                "resumeName": row.get("resume_name"),
+                "school": row.get("school"),
+                "startYear": row.get("start_year"),
+                "endYear": row.get("end_year"),
+                "jobTitle": row.get("job_title"),
+                "location": row.get("location"),
+                "avatar": row.get("avatar"),
+                "interests": row.get("interests")
             }
 
         return {
@@ -473,14 +505,22 @@ def update_profile(req: ProfileUpdateRequest, current_user: dict = Depends(get_c
             internships = json.dumps(req.internships) if req.internships is not None else json.dumps(row.get("internships", []))
             certificates = req.certificates if req.certificates is not None else row.get("certificates", [])
             resume_name = req.resumeName if req.resumeName is not None else row.get("resume_name")
+            school = req.school if req.school is not None else row.get("school")
+            start_year = req.startYear if req.startYear is not None else row.get("start_year")
+            end_year = req.endYear if req.endYear is not None else row.get("end_year")
+            job_title = req.jobTitle if req.jobTitle is not None else row.get("job_title")
+            location = req.location if req.location is not None else row.get("location")
+            avatar = req.avatar if req.avatar is not None else row.get("avatar")
+            interests = req.interests if req.interests is not None else row.get("interests")
 
             execute_query(
                 """UPDATE students 
                    SET name = %s, bio = %s, languages = %s, education = %s, 
                        edu_grad_year = %s, skills = %s, internships = %s, 
-                       certificates = %s, resume_name = %s 
+                       certificates = %s, resume_name = %s, school = %s,
+                       start_year = %s, end_year = %s, job_title = %s, location = %s, avatar = %s, interests = %s
                    WHERE id = %s""",
-                (name, bio, languages, education, edu_grad_year, skills, internships, certificates, resume_name, user_id),
+                (name, bio, languages, education, edu_grad_year, skills, internships, certificates, resume_name, school, start_year, end_year, job_title, location, avatar, interests, user_id),
                 commit=True,
                 fetch=False
             )
@@ -494,12 +534,14 @@ def update_profile(req: ProfileUpdateRequest, current_user: dict = Depends(get_c
             company = req.company if req.company is not None else row["company_name"]
             location = req.location if req.location is not None else row["location"]
             description = req.description if req.description is not None else row.get("description")
+            avatar = req.avatar if req.avatar is not None else row.get("avatar")
+            interests = req.interests if req.interests is not None else row.get("interests")
 
             execute_query(
                 """UPDATE hotels 
-                   SET company_name = %s, location = %s, description = %s 
+                   SET company_name = %s, location = %s, description = %s, avatar = %s, interests = %s 
                    WHERE id = %s""",
-                (company, location, description, user_id),
+                (company, location, description, avatar, interests, user_id),
                 commit=True,
                 fetch=False
             )

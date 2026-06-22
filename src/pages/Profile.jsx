@@ -1,5 +1,10 @@
-import React, { useState } from 'react';
-import { User, GraduationCap, Briefcase, Award, FileText, Plus, Trash2, CheckCircle, Upload, Save, Globe } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { User, GraduationCap, Briefcase, Award, FileText, Plus, Trash2, CheckCircle, Upload, Save, Globe, X } from 'lucide-react';
+import { WORLD_LANGUAGES } from '../data/languages';
+import { INDIAN_LOCATIONS } from '../data/locations';
+import { HM_COLLEGES_INDIA } from '../data/hmColleges';
+
+const YEAR_OPTIONS = Array.from({ length: 2040 - 1935 + 1 }, (_, i) => 2040 - i);
 
 export default function Profile({ user, updateUser, setCurrentPage }) {
   const [name, setName] = useState(user?.name || '');
@@ -8,22 +13,68 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
   const [bio, setBio] = useState(user?.bio || 'Passionate hotel management student focused on guest hospitality, luxury services, and front-desk software systems.');
   const [languages, setLanguages] = useState(user?.languages || 'English (Native), French (Conversational)');
   
-  // Education state
-  const [education, setEducation] = useState(user?.education || 'B.Sc. in Hotel Management, Cornell University');
-  const [eduGradYear, setEduGradYear] = useState(user?.eduGradYear || '2026');
+  const [education, setEducation] = useState(user?.education || '');
+  const [eduGradYear, setEduGradYear] = useState(user?.eduGradYear || '');
+  const [school, setSchool] = useState(user?.school || '');
+  const [schoolSuggestions, setSchoolSuggestions] = useState([]);
+  const [showSchoolSuggestions, setShowSchoolSuggestions] = useState(false);
+  const [startYear, setStartYear] = useState(user?.startYear || '');
+  const [endYear, setEndYear] = useState(user?.endYear || '');
+  const [jobTitle, setJobTitle] = useState(user?.jobTitle || '');
+  const [location, setLocation] = useState(user?.location || '');
+  const [locationSuggestions, setLocationSuggestions] = useState([]);
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const [avatar, setAvatar] = useState(user?.avatar || null);
+  const fileInputRef = useRef(null);
+
+  const [langSearch, setLangSearch] = useState('');
+  const [showLangDropdown, setShowLangDropdown] = useState(false);
+  const currentLanguages = languages.split(',').map(l => l.trim()).filter(l => l);
+
+  useEffect(() => {
+    if (location.length < 1) {
+      setLocationSuggestions([]);
+      return;
+    }
+    const q = location.toLowerCase();
+    const localMatches = INDIAN_LOCATIONS.filter(l => l.toLowerCase().includes(q)).slice(0, 15);
+    setLocationSuggestions(localMatches);
+  }, [location]);
+
+  useEffect(() => {
+    if (school.length < 1) {
+      setSchoolSuggestions([]);
+      return;
+    }
+    const q = school.toLowerCase();
+    const localMatches = HM_COLLEGES_INDIA.filter(c => c.toLowerCase().includes(q)).slice(0, 15);
+    setSchoolSuggestions(localMatches);
+  }, [school]);
+
+  const handleAddLanguage = (lang) => {
+    if (!currentLanguages.includes(lang)) {
+      setLanguages([...currentLanguages, lang].join(', '));
+    }
+    setLangSearch('');
+    setShowLangDropdown(false);
+  };
+
+  const handleRemoveLanguage = (langToRemove) => {
+    setLanguages(currentLanguages.filter(l => l !== langToRemove).join(', '));
+  };
 
   // Skills state
   const [skills, setSkills] = useState(user?.skills || ['Front Office Operations', 'Opera PMS', 'Guest Relations', 'Bilingual']);
   const [newSkill, setNewSkill] = useState('');
 
   // Internships state
-  const [internships, setInternships] = useState(user?.internships || [
-    { role: 'Front Desk Intern', company: 'Hilton Orlando', duration: '6 Months (2025)', desc: 'Assisted with guest registration, managed keycard distribution, resolved billing inquiries via Opera PMS, and maintained guest service logs.' }
-  ]);
+  const [internships, setInternships] = useState(user?.internships || []);
   const [newRole, setNewRole] = useState('');
   const [newCompany, setNewCompany] = useState('');
   const [newDuration, setNewDuration] = useState('');
   const [newDesc, setNewDesc] = useState('');
+  const [newCertificateName, setNewCertificateName] = useState('');
+  const [internshipError, setInternshipError] = useState('');
   const [showAddInternship, setShowAddInternship] = useState(false);
 
   // Certificates state
@@ -33,6 +84,7 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
   // Resume state
   const [resumeName, setResumeName] = useState(user?.resumeName || 'Alex_Mercer_Resume.pdf');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [profileError, setProfileError] = useState('');
 
   const handleAddSkill = (e) => {
     e.preventDefault();
@@ -60,13 +112,66 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
 
   const handleAddInternshipSubmit = (e) => {
     e.preventDefault();
-    if (newRole && newCompany && newDuration) {
-      setInternships([...internships, { role: newRole, company: newCompany, duration: newDuration, desc: newDesc }]);
+    
+    // Scenario 1: Certificate is uploaded -> Fields are optional
+    if (newCertificateName) {
+      setInternshipError('');
+      setInternships([
+        ...internships,
+        {
+          role: newRole.trim() || 'Internship (Attached Certificate)',
+          company: newCompany.trim() || 'Certificate Uploaded',
+          duration: newDuration.trim() || 'Attached Document',
+          desc: newDesc.trim(),
+          certificate: newCertificateName
+        }
+      ]);
       setNewRole('');
       setNewCompany('');
       setNewDuration('');
       setNewDesc('');
-      setShowAddInternship(false);
+      setNewCertificateName('');
+      return;
+    }
+    
+    // Scenario 2: Certificate is NOT uploaded -> Role, Company, Duration are mandatory
+    if (!newRole.trim() || !newCompany.trim() || !newDuration.trim()) {
+      setInternshipError('Please upload an internship certificate OR fill in the Role, Company, and Duration fields.');
+      return;
+    }
+    
+    setInternshipError('');
+    setInternships([
+      ...internships,
+      {
+        role: newRole.trim(),
+        company: newCompany.trim(),
+        duration: newDuration.trim(),
+        desc: newDesc.trim(),
+        certificate: ''
+      }
+    ]);
+    setNewRole('');
+    setNewCompany('');
+    setNewDuration('');
+    setNewDesc('');
+    setNewCertificateName('');
+  };
+
+  const handleInternshipCertificateChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setNewCertificateName(e.target.files[0].name);
+    }
+  };
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatar(reader.result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -82,6 +187,13 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
 
   const handleSaveProfile = (e) => {
     e.preventDefault();
+    setProfileError('');
+    
+    if (startYear && endYear && parseInt(startYear) > parseInt(endYear)) {
+      setProfileError('Start year cannot be greater than graduation year.');
+      return;
+    }
+
     updateUser({
       name,
       email,
@@ -90,6 +202,12 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
       languages,
       education,
       eduGradYear,
+      school,
+      startYear,
+      endYear,
+      jobTitle,
+      location,
+      avatar,
       skills,
       internships,
       certificates,
@@ -122,6 +240,12 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
         </button>
       </div>
 
+      {profileError && (
+        <div className="p-4 mb-6 rounded-2xl bg-red-50 text-red-800 border border-red-200 flex items-center gap-3 text-sm dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/40">
+          <span>{profileError}</span>
+        </div>
+      )}
+
       {saveSuccess && (
         <div className="p-4 mb-6 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-250 flex items-center gap-3 text-sm dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/40 animate-pulse-slow">
           <CheckCircle className="h-5 w-5 flex-shrink-0" />
@@ -136,8 +260,27 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
           
           {/* Avatar details */}
           <div className="p-6 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-850 rounded-3xl flex flex-col items-center text-center">
-            <div className="h-24 w-24 rounded-full bg-blue-800 dark:bg-amber-600 text-amber-500 dark:text-slate-900 flex items-center justify-center text-3xl font-bold shadow-md">
-              {name ? name.split(' ').map(n=>n[0]).join('').substring(0,2) : 'U'}
+            <div className="relative group">
+              <div className="h-24 w-24 rounded-full bg-blue-800 dark:bg-amber-600 text-amber-500 dark:text-slate-900 flex items-center justify-center text-3xl font-bold shadow-md overflow-hidden">
+                {avatar ? (
+                  <img src={avatar} alt="Profile" className="h-full w-full object-cover" />
+                ) : (
+                  name ? name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase() : 'U'
+                )}
+              </div>
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer text-white shadow-inner"
+              >
+                <Upload className="h-6 w-6" />
+              </button>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleAvatarChange} 
+                accept="image/*" 
+                className="hidden" 
+              />
             </div>
             <h3 className="font-display text-lg font-bold text-slate-955 dark:text-white mt-4">{name || 'Your Name'}</h3>
             <span className="text-xs text-slate-400 mt-1">{email}</span>
@@ -180,39 +323,36 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
           {/* Skills Management */}
           <div className="p-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-850 rounded-3xl flex flex-col">
             <h3 className="font-display text-sm font-bold text-slate-950 dark:text-white mb-3">Skills Tags</h3>
-            
-            <form onSubmit={handleAddSkill} className="flex gap-2 mb-4">
-              <input
-                type="text"
-                value={newSkill}
-                onChange={(e) => setNewSkill(e.target.value)}
-                placeholder="e.g. Opera PMS"
-                className="flex-grow rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-800 dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500"
-              />
-              <button
-                type="submit"
-                className="rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 p-2 cursor-pointer"
-              >
-                <Plus className="h-4 w-4 text-slate-700 dark:text-slate-300" />
-              </button>
-            </form>
-
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-nowrap overflow-x-auto no-scrollbar items-center gap-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 h-[46px] focus-within:border-blue-800 focus-within:bg-white dark:border-slate-800 dark:bg-slate-950 dark:focus-within:border-amber-500 transition-colors cursor-text" onClick={() => document.getElementById('skill-input')?.focus()}>
               {skills.map((skill) => (
                 <span
                   key={skill}
-                  className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-950 border border-slate-150/60 dark:border-slate-850 py-1 pl-2.5 pr-1.5 rounded-xl text-xs font-semibold text-slate-750 dark:text-slate-300"
+                  className="shrink-0 inline-flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 py-1 pl-2.5 pr-1.5 rounded-lg text-xs font-semibold text-slate-750 dark:text-slate-300 shadow-sm"
                 >
                   <span>{skill}</span>
                   <button
                     type="button"
-                    onClick={() => handleRemoveSkill(skill)}
-                    className="p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-red-500 cursor-pointer"
+                    onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); handleRemoveSkill(skill); }}
+                    className="p-0.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-red-500 cursor-pointer"
                   >
                     <X className="h-3 w-3" />
                   </button>
                 </span>
               ))}
+              <input
+                id="skill-input"
+                type="text"
+                value={newSkill}
+                onChange={(e) => setNewSkill(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddSkill(e);
+                  }
+                }}
+                placeholder={skills.length === 0 ? "e.g. Opera PMS" : ""}
+                className="flex-1 bg-transparent min-w-[120px] text-xs text-slate-900 focus:outline-none dark:text-white"
+              />
             </div>
           </div>
 
@@ -253,25 +393,106 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-450 uppercase tracking-wide">Phone Number</label>
-                <input
-                  type="text"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="rounded-xl border border-slate-205 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500"
-                />
+                <div className="flex rounded-xl overflow-hidden border border-slate-205 bg-slate-50 focus-within:border-blue-800 dark:border-slate-800 dark:bg-slate-950 dark:focus-within:border-amber-500 transition-colors">
+                  <div className="flex items-center justify-center px-3 bg-slate-100 dark:bg-slate-900 border-r border-slate-205 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs font-semibold">
+                    +91
+                  </div>
+                  <input
+                    type="text"
+                    value={phone.replace(/^\+?91\s*/, '')}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').substring(0, 10);
+                      setPhone('+91 ' + val);
+                    }}
+                    placeholder="xxxxxxxxx"
+                    className="flex-1 bg-transparent px-3 py-2.5 text-xs text-slate-900 focus:outline-none dark:text-white"
+                  />
+                </div>
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-450 uppercase tracking-wide">Languages Spoken</label>
+                <div className="flex flex-col gap-2">
+                  <div className="relative">
+                    <div className="flex flex-nowrap overflow-x-auto no-scrollbar items-center gap-1.5 w-full rounded-xl border border-slate-205 bg-slate-50 px-3 py-2 h-[46px] focus-within:border-blue-800 focus-within:bg-white dark:border-slate-800 dark:bg-slate-950 dark:focus-within:border-amber-500 transition-colors cursor-text" onClick={() => document.getElementById('lang-search-input')?.focus()}>
+                      {currentLanguages.map(lang => (
+                        <span key={lang} className="shrink-0 inline-flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 py-1 pl-2.5 pr-1.5 rounded-lg text-xs font-semibold text-slate-750 dark:text-slate-300 shadow-sm">
+                          <span>{lang}</span>
+                          <button type="button" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); handleRemoveLanguage(lang); }} className="p-0.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-red-500 cursor-pointer">
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                      <input
+                        id="lang-search-input"
+                        type="text"
+                        value={langSearch}
+                        onChange={(e) => { setLangSearch(e.target.value); setShowLangDropdown(true); }}
+                        onFocus={() => setShowLangDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowLangDropdown(false), 200)}
+                        placeholder={currentLanguages.length === 0 ? "Search and add a language..." : ""}
+                        className="flex-1 bg-transparent min-w-[120px] text-xs text-slate-900 focus:outline-none dark:text-white"
+                      />
+                    </div>
+                    {showLangDropdown && (
+                      <ul className="absolute z-10 w-full mt-1 max-h-48 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg">
+                        {WORLD_LANGUAGES.filter(l => l.toLowerCase().includes(langSearch.toLowerCase())).map(lang => (
+                          <li
+                            key={lang}
+                            onMouseDown={(e) => { e.preventDefault(); handleAddLanguage(lang); }}
+                            className="px-4 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                          >
+                            {lang}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-455 uppercase tracking-wide">Location</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={location}
+                    onChange={(e) => { setLocation(e.target.value); setShowLocationSuggestions(true); }}
+                    onFocus={() => setShowLocationSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowLocationSuggestions(false), 200)}
+                    placeholder="e.g. Mumbai, Maharashtra"
+                    className="w-full rounded-xl border border-slate-205 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500"
+                  />
+                  {showLocationSuggestions && location && (
+                    <ul className="absolute z-10 w-full top-[100%] mt-1 max-h-48 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg">
+                      {locationSuggestions.map((place, idx) => (
+                        <li key={idx} 
+                            onMouseDown={(e) => { e.preventDefault(); setLocation(place); setShowLocationSuggestions(false); }}
+                            className="px-4 py-2 text-[11px] leading-tight text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors border-b border-slate-100 dark:border-slate-800 last:border-0">
+                          {place}
+                        </li>
+                      ))}
+                      {locationSuggestions.length === 0 && location.length >= 1 && (
+                          <li className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400 italic text-center">No matching places found.</li>
+                      )}
+                    </ul>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-455 uppercase tracking-wide">Job Title (Optional)</label>
                 <input
                   type="text"
-                  value={languages}
-                  onChange={(e) => setLanguages(e.target.value)}
+                  value={jobTitle}
+                  onChange={(e) => setJobTitle(e.target.value)}
+                  placeholder="e.g. Front Office Manager"
                   className="rounded-xl border border-slate-205 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500"
                 />
               </div>
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className="text-xs font-bold text-slate-450 uppercase tracking-wide">Brief Biography</label>
               <textarea
                 rows={3}
@@ -290,25 +511,59 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-5">
-              <div className="sm:col-span-3 flex flex-col gap-1.5">
+              <div className="sm:col-span-4 flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-450 uppercase tracking-wide">School / University / Institute</label>
-                <input
-                  type="text"
-                  value={education}
-                  onChange={(e) => setEducation(e.target.value)}
-                  placeholder="e.g. B.Sc. in Hotel Management, Cornell University"
-                  className="rounded-xl border border-slate-205 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={school || education}
+                    onChange={(e) => { setSchool(e.target.value); setEducation(e.target.value); setShowSchoolSuggestions(true); }}
+                    onFocus={() => setShowSchoolSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowSchoolSuggestions(false), 200)}
+                    placeholder="e.g. IHM Pusa"
+                    className="w-full rounded-xl border border-slate-205 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500"
+                  />
+                  {showSchoolSuggestions && (school || education) && (
+                    <ul className="absolute z-10 w-full top-[100%] mt-1 max-h-48 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg">
+                      {schoolSuggestions.map((place, idx) => (
+                        <li key={idx} 
+                            onMouseDown={(e) => { e.preventDefault(); setSchool(place); setEducation(place); setShowSchoolSuggestions(false); }}
+                            className="px-4 py-2 text-[11px] leading-tight text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors border-b border-slate-100 dark:border-slate-800 last:border-0">
+                          {place}
+                        </li>
+                      ))}
+                      {schoolSuggestions.length === 0 && (school || education).length >= 1 && (
+                          <li className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400 italic text-center">No matching colleges found.</li>
+                      )}
+                    </ul>
+                  )}
+                </div>
               </div>
-              <div className="sm:col-span-1 flex flex-col gap-1.5">
+              <div className="sm:col-span-2 flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-455 uppercase tracking-wide">Start Year</label>
+                <select
+                  value={startYear}
+                  onChange={(e) => setStartYear(e.target.value)}
+                  className="rounded-xl border border-slate-205 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500 cursor-pointer"
+                >
+                  <option value="" disabled>Select Year</option>
+                  {YEAR_OPTIONS.map(yr => (
+                    <option key={yr} value={yr}>{yr}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="sm:col-span-2 flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-455 uppercase tracking-wide">Graduation Year</label>
-                <input
-                  type="text"
-                  value={eduGradYear}
-                  onChange={(e) => setEduGradYear(e.target.value)}
-                  placeholder="e.g. 2026"
-                  className="rounded-xl border border-slate-205 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500"
-                />
+                <select
+                  value={endYear || eduGradYear}
+                  onChange={(e) => { setEndYear(e.target.value); setEduGradYear(e.target.value); }}
+                  className="rounded-xl border border-slate-205 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500 cursor-pointer"
+                >
+                  <option value="" disabled>Select Year</option>
+                  {YEAR_OPTIONS.map(yr => (
+                    <option key={yr} value={yr}>{yr}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -336,7 +591,6 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
                     <label className="text-[10px] font-bold text-slate-450 uppercase">Role / Job Title</label>
                     <input
                       type="text"
-                      required
                       value={newRole}
                       onChange={(e) => setNewRole(e.target.value)}
                       placeholder="e.g. F&B Rotation Intern"
@@ -347,7 +601,6 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
                     <label className="text-[10px] font-bold text-slate-450 uppercase">Hotel / Company</label>
                     <input
                       type="text"
-                      required
                       value={newCompany}
                       onChange={(e) => setNewCompany(e.target.value)}
                       placeholder="e.g. Ritz-Carlton Miami"
@@ -358,7 +611,6 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
                     <label className="text-[10px] font-bold text-slate-450 uppercase">Duration</label>
                     <input
                       type="text"
-                      required
                       value={newDuration}
                       onChange={(e) => setNewDuration(e.target.value)}
                       placeholder="e.g. 6 Months (2025)"
@@ -368,7 +620,7 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-450 uppercase">Description of Duties</label>
+                  <label className="text-[10px] font-bold text-slate-455 uppercase">Description of Duties</label>
                   <textarea
                     rows={2}
                     value={newDesc}
@@ -378,9 +630,41 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
                   ></textarea>
                 </div>
 
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-455 uppercase">Internship Certificate</label>
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-1.5 px-3 py-2 bg-slate-200 dark:bg-slate-850 hover:bg-slate-300 dark:hover:bg-slate-750 text-xs font-semibold text-slate-700 dark:text-slate-300 rounded-xl cursor-pointer transition-colors max-w-max">
+                      <Upload className="h-3.5 w-3.5 text-slate-500" />
+                      <span>{newCertificateName || "Upload Certificate (PDF / Image)"}</span>
+                      <input
+                        type="file"
+                        accept=".pdf,image/*"
+                        onChange={(e) => {
+                          handleInternshipCertificateChange(e);
+                          setInternshipError('');
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                    {newCertificateName && (
+                      <button
+                        type="button"
+                        onClick={() => setNewCertificateName('')}
+                        className="text-slate-450 hover:text-red-500 cursor-pointer"
+                        title="Remove uploaded file"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  {internshipError && (
+                    <p className="text-[11px] font-semibold text-red-500 dark:text-red-400 mt-1">{internshipError}</p>
+                  )}
+                </div>
+
                 <button
                   type="submit"
-                  className="rounded-xl bg-blue-800 text-white dark:bg-amber-600 dark:text-slate-900 py-2 text-xs font-bold hover:bg-blue-755"
+                  className="rounded-xl bg-blue-800 text-white dark:bg-amber-600 dark:text-slate-900 py-2 text-xs font-bold hover:bg-blue-755 cursor-pointer"
                 >
                   Save Internship Detail
                 </button>
@@ -393,10 +677,22 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
                 {internships.map((intern, idx) => (
                   <div key={idx} className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850 rounded-2xl relative flex justify-between items-start gap-4">
                     <div>
-                      <h4 className="font-bold text-sm text-slate-955 dark:text-white">{intern.role}</h4>
-                      <p className="text-xs text-slate-600 dark:text-slate-400 font-semibold mt-0.5">{intern.company} • {intern.duration}</p>
+                      {intern.role && (
+                        <h4 className="font-bold text-sm text-slate-955 dark:text-white">{intern.role}</h4>
+                      )}
+                      {(intern.company || intern.duration) && (
+                        <p className="text-xs text-slate-600 dark:text-slate-400 font-semibold mt-0.5">
+                          {intern.company}{intern.company && intern.duration ? ' • ' : ''}{intern.duration}
+                        </p>
+                      )}
                       {intern.desc && (
                         <p className="text-xs text-slate-450 mt-2.5 leading-relaxed">{intern.desc}</p>
+                      )}
+                      {intern.certificate && (
+                        <div className="flex items-center gap-1.5 mt-2.5 text-[10px] text-blue-800 dark:text-amber-500 font-bold bg-blue-50 dark:bg-slate-900 border border-blue-100 dark:border-slate-800 px-2.5 py-1 rounded-lg max-w-max">
+                          <FileText className="h-3.5 w-3.5" />
+                          <span>{intern.certificate}</span>
+                        </div>
                       )}
                     </div>
                     <button

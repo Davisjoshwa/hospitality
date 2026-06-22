@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, PlusCircle, Briefcase, Users, UserCheck, Settings, Eye, Check, X, Calendar, Plus, FileText } from 'lucide-react';
+import { INDIAN_LOCATIONS } from '../data/locations';
 
 export default function RecruiterDashboard({ user, jobs, postJob, appliedJobs, savedJobs, setCurrentPage, currentPage }) {
   // Map global routes to local tab identifiers
@@ -13,13 +14,26 @@ export default function RecruiterDashboard({ user, jobs, postJob, appliedJobs, s
   // Job Post State
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('Front Office & Guest Relations');
-  const [location, setLocation] = useState('New York, NY');
+  const [location, setLocation] = useState('Mumbai, Maharashtra');
   const [type, setType] = useState('Full-time');
   const [experience, setExperience] = useState('Mid-level (2-4 years)');
   const [salary, setSalary] = useState('$65,000 - $75,000 / year');
   const [description, setDescription] = useState('');
   const [requirementsText, setRequirementsText] = useState('');
   const [postedSuccess, setPostedSuccess] = useState(false);
+
+  const [locationSuggestions, setLocationSuggestions] = useState([]);
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+
+  useEffect(() => {
+    if (location.length < 1) {
+      setLocationSuggestions([]);
+      return;
+    }
+    const q = location.toLowerCase();
+    const localMatches = INDIAN_LOCATIONS.filter(l => l.toLowerCase().includes(q)).slice(0, 15);
+    setLocationSuggestions(localMatches);
+  }, [location]);
 
   // Recruiter's company
   const company = user?.company || 'Marriott International';
@@ -260,17 +274,33 @@ export default function RecruiterDashboard({ user, jobs, postJob, appliedJobs, s
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5 relative">
                       <label htmlFor="location" className="text-xs font-bold text-slate-400 uppercase tracking-wide">Location</label>
                       <input
                         type="text"
                         id="location"
                         required
                         value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                        placeholder="e.g. Miami, FL"
+                        onChange={(e) => { setLocation(e.target.value); setShowLocationSuggestions(true); }}
+                        onFocus={() => setShowLocationSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowLocationSuggestions(false), 200)}
+                        placeholder="e.g. Mumbai, Maharashtra"
                         className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500"
                       />
+                      {showLocationSuggestions && location && (
+                        <ul className="absolute z-10 w-full top-[100%] mt-1 max-h-48 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg">
+                          {locationSuggestions.map((place, idx) => (
+                            <li key={idx} 
+                                onMouseDown={(e) => { e.preventDefault(); setLocation(place); setShowLocationSuggestions(false); }}
+                                className="px-4 py-2 text-[11px] leading-tight text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors border-b border-slate-100 dark:border-slate-800 last:border-0">
+                              {place}
+                            </li>
+                          ))}
+                          {locationSuggestions.length === 0 && location.length >= 1 && (
+                              <li className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400 italic text-center">No matching places found.</li>
+                          )}
+                        </ul>
+                      )}
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <label htmlFor="type" className="text-xs font-bold text-slate-400 uppercase tracking-wide">Job Type</label>

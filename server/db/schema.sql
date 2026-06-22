@@ -25,8 +25,11 @@ CREATE TABLE hotels (
   phone VARCHAR(50),
   password_hash VARCHAR(255) NOT NULL,
   company_name VARCHAR(255) NOT NULL,
+  job_title VARCHAR(255),
   location VARCHAR(255) NOT NULL,
   description TEXT,
+  avatar TEXT,
+  interests VARCHAR(500),
   is_verified BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -38,6 +41,14 @@ CREATE TABLE students (
   phone VARCHAR(50),
   password_hash VARCHAR(255) NOT NULL,
   name VARCHAR(255) NOT NULL,
+  location VARCHAR(255),
+  school VARCHAR(255),
+  field_of_study VARCHAR(255),
+  start_year INT,
+  end_year INT,
+  age_over_16 BOOLEAN DEFAULT TRUE,
+  job_title VARCHAR(255),
+  avatar TEXT,
   bio TEXT,
   languages VARCHAR(255),
   education TEXT,
@@ -46,6 +57,7 @@ CREATE TABLE students (
   internships JSONB DEFAULT '[]'::jsonb,
   certificates TEXT[] DEFAULT '{}',
   resume_name VARCHAR(255),
+  interests VARCHAR(500),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

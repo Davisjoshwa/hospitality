@@ -36,13 +36,20 @@ def run_seed():
         # 3. Seed users
         print("Seeding students table...")
         cursor.execute(
-            """INSERT INTO students (email, phone, password_hash, name, bio, languages, education, edu_grad_year, skills, internships, certificates, resume_name) 
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
+            """INSERT INTO students (email, phone, password_hash, name, location, school, field_of_study, start_year, end_year, age_over_16, job_title, bio, languages, education, edu_grad_year, skills, internships, certificates, resume_name, interests) 
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
             (
                 'student@cornell.edu',
                 '+1 (555) 019-2834',
                 student_pass_hash,
                 'Alex Mercer',
+                'Ithaca, NY',
+                'Cornell University',
+                'Hotel Management',
+                2022,
+                2026,
+                True,
+                None,
                 'Passionate hotel management student focused on guest hospitality, luxury services, and front-desk software systems.',
                 'English (Native), French (Conversational)',
                 'B.Sc. in Hotel Management, Cornell University',
@@ -57,23 +64,26 @@ def run_seed():
                   }
                 ]),
                 ['ServSafe Manager', 'AHLEI Certified Front Desk Representative'],
-                'Alex_Mercer_Resume.pdf'
+                'Alex_Mercer_Resume.pdf',
+                'Cooking, Traveling, Event Planning'
             )
         )
         student_id = cursor.fetchone()[0]
 
         print("Seeding hotels table...")
         cursor.execute(
-            """INSERT INTO hotels (email, phone, password_hash, company_name, location, description, is_verified) 
-               VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id""",
+            """INSERT INTO hotels (email, phone, password_hash, company_name, job_title, location, description, is_verified, interests) 
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
             (
                 'recruiter@marriott.com',
                 '+1 (555) 048-9321',
                 recruiter_pass_hash,
                 'Marriott International',
+                'HR Manager',
                 'Orlando, FL',
                 'Marriott International is an American multinational company that operates, franchises, and licenses lodging including hotel, residential, and timeshare properties.',
-                True
+                True,
+                'Team Leadership, Customer Service'
             )
         )
         hotel_id = cursor.fetchone()[0]

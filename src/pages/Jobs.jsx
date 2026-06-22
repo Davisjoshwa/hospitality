@@ -18,9 +18,9 @@ export default function Jobs({ jobs, applyToJob, appliedJobs, savedJobs, toggleS
   const experiences = ['Entry-level (0-1 year)', 'Mid-level (2-4 years)', 'Senior-level (5+ years)'];
   const types = ['Full-time', 'Part-time', 'Internship'];
 
-  // Filter logic
+  // Filter and Personalize logic
   const filteredJobs = useMemo(() => {
-    return jobs.filter(job => {
+    let result = jobs.filter(job => {
       const matchSearch = job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           job.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           job.category.toLowerCase().includes(searchTerm.toLowerCase());
@@ -38,7 +38,36 @@ export default function Jobs({ jobs, applyToJob, appliedJobs, savedJobs, toggleS
 
       return matchSearch && matchLocation && matchExperience && matchType && matchSalary;
     });
-  }, [jobs, searchTerm, selectedLocation, selectedExperience, selectedType, selectedSalary]);
+
+    // Personalization sorting: Prioritize user's location and onboarding interests
+    if (user && user.role === 'student') {
+      const userLoc = user.location ? user.location.toLowerCase() : '';
+      const userInterestsArr = user.interests ? user.interests.toLowerCase().split(',').map(i => i.trim()).filter(Boolean) : [];
+
+      result.sort((a, b) => {
+        let scoreA = 0;
+        let scoreB = 0;
+
+        // Location match (+2 points priority)
+        if (userLoc && a.location.toLowerCase() === userLoc) scoreA += 2;
+        if (userLoc && b.location.toLowerCase() === userLoc) scoreB += 2;
+
+        // Interests match (+1 point priority)
+        if (userInterestsArr.length > 0) {
+          const aText = (a.category + ' ' + a.title + ' ' + (a.description || '')).toLowerCase();
+          const bText = (b.category + ' ' + b.title + ' ' + (b.description || '')).toLowerCase();
+          
+          if (userInterestsArr.some(interest => aText.includes(interest))) scoreA += 1;
+          if (userInterestsArr.some(interest => bText.includes(interest))) scoreB += 1;
+        }
+
+        // Descending order (highest score first)
+        return scoreB - scoreA;
+      });
+    }
+
+    return result;
+  }, [jobs, searchTerm, selectedLocation, selectedExperience, selectedType, selectedSalary, user]);
 
   const handleClearFilters = () => {
     setSearchTerm('');
@@ -102,7 +131,7 @@ export default function Jobs({ jobs, applyToJob, appliedJobs, savedJobs, toggleS
               onChange={(e) => setSelectedLocation(e.target.value)}
               className="w-full rounded-2xl border border-slate-200/80 bg-slate-50 pl-11 pr-4 py-3.5 text-sm text-slate-650 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-amber-500 appearance-none cursor-pointer"
             >
-              <option value="">All Locations (USA)</option>
+              <option value="">All Locations</option>
               {locations.map(loc => (
                 <option key={loc} value={loc}>{loc}</option>
               ))}

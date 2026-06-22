@@ -85,9 +85,12 @@ export default function App() {
   }, []);
 
   // Auth helper: sets local storage and state
-  const handleAuthSuccess = async (token, userData) => {
+  const handleAuthSuccess = async (token, userData, redirectPage) => {
     localStorage.setItem('token', token);
     setUser(userData);
+    if (redirectPage) {
+      setCurrentPage(redirectPage);
+    }
     
     if (userData.role === 'student') {
       try {

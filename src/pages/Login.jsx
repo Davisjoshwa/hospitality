@@ -28,18 +28,18 @@ export default function Login({ onAuthSuccess, setCurrentPage }) {
 
     const isEmail = loginInput.includes('@');
     if (isEmail) {
-      const allowedDomains = ['@gmail.com', '@cornell.edu', '@marriott.com', '@hospihire.com'];
-      const matchesAllowed = allowedDomains.some(dom => loginInput.endsWith(dom));
-      if (!matchesAllowed || !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(loginInput)) {
-        setError('Please enter a valid Gmail address ending in @gmail.com.');
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(loginInput)) {
+        setError('Please enter a valid email address.');
         setLoading(false);
         return;
       }
     } else {
-      // Clean other characters like spaces, dashes, etc.
-      const phoneCleaned = loginInput.replace(/[\s\-\+\(\)]/g, '');
+      // Clean other characters
+      let phoneCleaned = loginInput.replace(/[\s\-\+\(\)]/g, '');
+      if (phoneCleaned.length === 10) phoneCleaned = '91' + phoneCleaned;
       if (!/^91\d{10}$/.test(phoneCleaned)) {
-        setError('Please enter a valid 10-digit phone number or Gmail address.');
+        setError('Please enter a valid 10-digit phone number or email address.');
         setLoading(false);
         return;
       }
