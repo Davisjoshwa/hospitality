@@ -75,6 +75,9 @@ export default function Register({ onAuthSuccess, setCurrentPage, defaultRole = 
   const [selectedInterests, setSelectedInterests] = useState([]);
   const [otherInterest, setOtherInterest] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
+  const [touched, setTouched] = useState({});
+
+  const handleBlur = (field) => setTouched(prev => ({...prev, [field]: true}));
 
   // OTP state
   const [otpStep, setOtpStep] = useState(false);
@@ -222,18 +225,16 @@ export default function Register({ onAuthSuccess, setCurrentPage, defaultRole = 
     if (simRole === 'student') {
       mockUser = {
         id: 'mock-student-id',
-        name: 'Alex Mercer',
+        name: '',
         email: 'student@cornell.edu',
-        phone: '+1 (555) 019-2834',
+        phone: '',
         role: 'student',
-        education: 'B.Sc. in Hotel Management, Cornell University',
+        education: '',
         eduGradYear: '2026',
-        skills: ['Front Office Operations', 'Opera PMS', 'Guest Relations', 'Fluent in French'],
-        internships: [
-          { role: 'Front Desk Intern', company: 'Hilton Orlando', duration: '6 Months (2025)', desc: 'Assisted with guest registration, managed keycard distribution, resolved billing inquiries via Opera PMS, and maintained guest service logs.' }
-        ],
-        certificates: ['ServSafe Manager', 'AHLEI Certified Front Desk Representative'],
-        resumeName: 'Alex_Mercer_Resume.pdf'
+        skills: [],
+        internships: [],
+        certificates: [],
+        resumeName: null
       };
     } else if (simRole === 'recruiter') {
       mockUser = {
@@ -669,10 +670,10 @@ export default function Register({ onAuthSuccess, setCurrentPage, defaultRole = 
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <input type="email" id="email" required value={email}
                       onChange={e => { setEmail(e.target.value); setError(''); }}
-                      onBlur={() => setEmailTouched(true)}
+                      onBlur={() => { setEmailTouched(true); handleBlur('email'); }}
                       placeholder="name@hotel.edu"
                       className={`w-full rounded-xl border bg-slate-50 pl-10 pr-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:bg-white dark:bg-slate-950 dark:text-white transition-colors ${
-                        emailError ? 'border-red-400 focus:border-red-500 dark:border-red-700'
+                        emailError || (touched.email && !email) ? 'border-red-400 focus:border-red-500 dark:border-red-700'
                         : emailTouched && email && isEmailValid ? 'border-green-500 focus:border-green-500 dark:border-green-600'
                         : 'border-slate-200 focus:border-blue-800 dark:border-slate-800 dark:focus:border-amber-500'
                       }`} />
@@ -683,23 +684,7 @@ export default function Register({ onAuthSuccess, setCurrentPage, defaultRole = 
                     )}
                   </div>
                   {emailError && <p className="text-[10px] text-red-500 mt-0.5">{emailError}</p>}
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="phone" className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Phone Number (Optional)</label>
-                  <div className="flex rounded-xl overflow-hidden border border-slate-200 bg-slate-50 focus-within:border-blue-800 dark:border-slate-800 dark:bg-slate-950 dark:focus-within:border-amber-500 transition-colors">
-                    <div className="flex items-center justify-center px-3 bg-slate-100 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs font-semibold">
-                      +91
-                    </div>
-                    <input type="text" id="phone" value={phone.replace(/^\+?91\s*/, '')}
-                      onChange={e => {
-                        const val = e.target.value.replace(/\D/g, '').substring(0, 10);
-                        setPhone(val);
-                        setError('');
-                      }}
-                      placeholder="xxxxxxxxx"
-                      className="flex-1 bg-transparent px-3 py-2.5 text-xs text-slate-900 focus:outline-none dark:text-white" />
-                  </div>
+                  {touched.email && !email && <p className="text-[10px] text-red-500 mt-0.5 ml-1">This field is required</p>}
                 </div>
 
                 <div className="flex flex-col gap-1.5">
@@ -708,8 +693,11 @@ export default function Register({ onAuthSuccess, setCurrentPage, defaultRole = 
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <input type={showPassword ? 'text' : 'password'} id="password" required value={password}
                       onChange={e => { setPassword(e.target.value); setPasswordTouched(true); setError(''); }}
+                      onBlur={() => handleBlur('password')}
                       placeholder="Create a strong password"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500" />
+                      className={`w-full rounded-xl border bg-slate-50 pl-10 pr-10 py-2.5 text-xs text-slate-900 focus:outline-none focus:bg-white dark:bg-slate-950 dark:text-white transition-colors ${
+                        touched.password && !password ? 'border-red-400 focus:border-red-500 dark:border-red-700' : 'border-slate-200 focus:border-blue-800 dark:border-slate-800 dark:focus:border-amber-500'
+                      }`} />
                     <button type="button" onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer">
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -733,9 +721,11 @@ export default function Register({ onAuthSuccess, setCurrentPage, defaultRole = 
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <input type={showConfirm ? 'text' : 'password'} id="confirmPassword" required value={confirmPassword}
                       onChange={e => { setConfirmPassword(e.target.value); setError(''); }}
+                      onBlur={() => handleBlur('confirmPassword')}
                       placeholder="Re-enter your password"
                       className={`w-full rounded-xl border bg-slate-50 pl-10 pr-10 py-2.5 text-xs text-slate-900 focus:outline-none focus:bg-white dark:bg-slate-950 dark:text-white transition-colors ${
                         confirmPassword && password !== confirmPassword ? 'border-red-400 focus:border-red-500 dark:border-red-700'
+                        : touched.confirmPassword && !confirmPassword ? 'border-red-400 focus:border-red-500 dark:border-red-700'
                         : confirmPassword && passwordsMatch ? 'border-green-500 focus:border-green-500 dark:border-green-600'
                         : 'border-slate-200 focus:border-blue-800 dark:border-slate-800 dark:focus:border-amber-500'
                       }`} />
@@ -759,9 +749,13 @@ export default function Register({ onAuthSuccess, setCurrentPage, defaultRole = 
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <input type="text" id="firstName" required value={firstName}
                       onChange={e => { setFirstName(e.target.value); setError(''); }}
+                      onBlur={() => handleBlur('firstName')}
                       placeholder="John"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500 transition-colors" />
+                      className={`w-full rounded-xl border bg-slate-50 pl-10 pr-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:bg-white dark:bg-slate-950 dark:text-white transition-colors ${
+                        touched.firstName && !firstName ? 'border-red-400 focus:border-red-500 dark:border-red-700' : 'border-slate-200 focus:border-blue-800 dark:border-slate-800 dark:focus:border-amber-500'
+                      }`} />
                   </div>
+                  {touched.firstName && !firstName && <p className="text-[10px] text-red-500 mt-0.5 ml-1">This field is required</p>}
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="middleName" className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Middle Name</label>
@@ -779,9 +773,13 @@ export default function Register({ onAuthSuccess, setCurrentPage, defaultRole = 
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <input type="text" id="lastName" required value={lastName}
                       onChange={e => { setLastName(e.target.value); setError(''); }}
+                      onBlur={() => handleBlur('lastName')}
                       placeholder="Doe"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500 transition-colors" />
+                      className={`w-full rounded-xl border bg-slate-50 pl-10 pr-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:bg-white dark:bg-slate-950 dark:text-white transition-colors ${
+                        touched.lastName && !lastName ? 'border-red-400 focus:border-red-500 dark:border-red-700' : 'border-slate-200 focus:border-blue-800 dark:border-slate-800 dark:focus:border-amber-500'
+                      }`} />
                   </div>
+                  {touched.lastName && !lastName && <p className="text-[10px] text-red-500 mt-0.5 ml-1">This field is required</p>}
                 </div>
               </div>
             )}
@@ -796,9 +794,11 @@ export default function Register({ onAuthSuccess, setCurrentPage, defaultRole = 
                   <input type="text" id="location" required value={location}
                     onChange={e => { setLocation(e.target.value); setError(''); setShowLocationSuggestions(true); }}
                     onFocus={() => setShowLocationSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowLocationSuggestions(false), 200)}
+                    onBlur={() => { handleBlur('location'); setTimeout(() => setShowLocationSuggestions(false), 200); }}
                     placeholder="e.g. Mumbai, Maharashtra"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-3 text-sm text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500 transition-colors" />
+                    className={`w-full rounded-xl border bg-slate-50 pl-10 pr-4 py-3 text-sm text-slate-900 focus:outline-none focus:bg-white dark:bg-slate-950 dark:text-white transition-colors ${
+                      touched.location && !location ? 'border-red-400 focus:border-red-500 dark:border-red-700' : 'border-slate-200 focus:border-blue-800 dark:border-slate-800 dark:focus:border-amber-500'
+                    }`} />
                   {isFetchingLocation && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
                       <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
@@ -839,9 +839,12 @@ export default function Register({ onAuthSuccess, setCurrentPage, defaultRole = 
                       <input type="text" id="school" required value={school}
                         onChange={e => { setSchool(e.target.value); setError(''); setShowSchoolSuggestions(true); }}
                         onFocus={() => setShowSchoolSuggestions(true)}
-                        onBlur={() => setTimeout(() => setShowSchoolSuggestions(false), 200)}
+                        onBlur={() => { handleBlur('school'); setTimeout(() => setShowSchoolSuggestions(false), 200); }}
                         placeholder="Ex: IHM Mumbai"
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500 transition-colors" />
+                        className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:bg-white dark:bg-slate-950 dark:text-white transition-colors ${
+                          touched.school && !school ? 'border-red-400 focus:border-red-500 dark:border-red-700' : 'border-slate-200 focus:border-blue-800 dark:border-slate-800 dark:focus:border-amber-500'
+                        }`} />
+                      {touched.school && !school && <p className="text-[10px] text-red-500 mt-0.5 ml-1">This field is required</p>}
                       
                       {isFetchingSchool && (
                         <div className="absolute right-3 top-9">
@@ -869,24 +872,32 @@ export default function Register({ onAuthSuccess, setCurrentPage, defaultRole = 
                         <label htmlFor="startYear" className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Start Year*</label>
                         <select id="startYear" required value={startYear}
                           onChange={e => { setStartYear(e.target.value); setError(''); }}
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500 transition-colors cursor-pointer appearance-none">
+                          onBlur={() => handleBlur('startYear')}
+                          className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:bg-white dark:bg-slate-950 dark:text-white transition-colors cursor-pointer appearance-none ${
+                            touched.startYear && !startYear ? 'border-red-400 focus:border-red-500 dark:border-red-700' : 'border-slate-200 focus:border-blue-800 dark:border-slate-800 dark:focus:border-amber-500'
+                          }`}>
                           <option value="" disabled>Select Year</option>
                           {YEAR_OPTIONS.map(yr => (
                             <option key={yr} value={yr}>{yr}</option>
                           ))}
                         </select>
+                        {touched.startYear && !startYear && <p className="text-[10px] text-red-500 mt-0.5 ml-1">This field is required</p>}
                       </div>
                       
                       <div className="flex flex-col gap-1.5 flex-1">
                         <label htmlFor="endYear" className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Passout Year*</label>
                         <select id="endYear" required value={endYear}
                           onChange={e => { setEndYear(e.target.value); setError(''); }}
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500 transition-colors cursor-pointer appearance-none">
+                          onBlur={() => handleBlur('endYear')}
+                          className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:bg-white dark:bg-slate-950 dark:text-white transition-colors cursor-pointer appearance-none ${
+                            touched.endYear && !endYear ? 'border-red-400 focus:border-red-500 dark:border-red-700' : 'border-slate-200 focus:border-blue-800 dark:border-slate-800 dark:focus:border-amber-500'
+                          }`}>
                           <option value="" disabled>Select Year</option>
                           {YEAR_OPTIONS.map(yr => (
                             <option key={yr} value={yr}>{yr}</option>
                           ))}
                         </select>
+                        {touched.endYear && !endYear && <p className="text-[10px] text-red-500 mt-0.5 ml-1">This field is required</p>}
                       </div>
                     </div>
 
@@ -904,9 +915,13 @@ export default function Register({ onAuthSuccess, setCurrentPage, defaultRole = 
                       <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                       <input type="text" id="studentJobTitle" required value={jobTitle}
                         onChange={e => { setJobTitle(e.target.value); setError(''); }}
+                        onBlur={() => handleBlur('jobTitle')}
                         placeholder="Ex: Front Desk Manager"
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500 transition-colors" />
+                        className={`w-full rounded-xl border bg-slate-50 pl-10 pr-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:bg-white dark:bg-slate-950 dark:text-white transition-colors ${
+                          touched.jobTitle && !jobTitle ? 'border-red-400 focus:border-red-500 dark:border-red-700' : 'border-slate-200 focus:border-blue-800 dark:border-slate-800 dark:focus:border-amber-500'
+                        }`} />
                     </div>
+                    {touched.jobTitle && !jobTitle && <p className="text-[10px] text-red-500 mt-0.5 ml-1">This field is required</p>}
                   </div>
                 )}
               </div>
@@ -920,9 +935,13 @@ export default function Register({ onAuthSuccess, setCurrentPage, defaultRole = 
                     <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <input type="text" id="company" required value={company}
                       onChange={e => { setCompany(e.target.value); setError(''); }}
+                      onBlur={() => handleBlur('company')}
                       placeholder="e.g. Marriott International / Hilton"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500 transition-colors" />
+                      className={`w-full rounded-xl border bg-slate-50 pl-10 pr-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:bg-white dark:bg-slate-950 dark:text-white transition-colors ${
+                        touched.company && !company ? 'border-red-400 focus:border-red-500 dark:border-red-700' : 'border-slate-200 focus:border-blue-800 dark:border-slate-800 dark:focus:border-amber-500'
+                      }`} />
                   </div>
+                  {touched.company && !company && <p className="text-[10px] text-red-500 mt-0.5 ml-1">This field is required</p>}
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="jobTitle" className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Job Title*</label>
@@ -930,9 +949,13 @@ export default function Register({ onAuthSuccess, setCurrentPage, defaultRole = 
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <input type="text" id="jobTitle" required value={jobTitle}
                       onChange={e => { setJobTitle(e.target.value); setError(''); }}
-                      placeholder="e.g. HR Manager, Front Desk Supervisor"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500 transition-colors" />
+                      onBlur={() => handleBlur('jobTitle')}
+                      placeholder="Ex: HR Manager / Director of Recruitment"
+                      className={`w-full rounded-xl border bg-slate-50 pl-10 pr-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:bg-white dark:bg-slate-950 dark:text-white transition-colors ${
+                        touched.jobTitle && !jobTitle ? 'border-red-400 focus:border-red-500 dark:border-red-700' : 'border-slate-200 focus:border-blue-800 dark:border-slate-800 dark:focus:border-amber-500'
+                      }`} />
                   </div>
+                  {touched.jobTitle && !jobTitle && <p className="text-[10px] text-red-500 mt-0.5 ml-1">This field is required</p>}
                 </div>
               </div>
             )}

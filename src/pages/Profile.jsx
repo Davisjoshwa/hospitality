@@ -9,9 +9,9 @@ const YEAR_OPTIONS = Array.from({ length: 2040 - 1935 + 1 }, (_, i) => 2040 - i)
 export default function Profile({ user, updateUser, setCurrentPage }) {
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
-  const [phone, setPhone] = useState(user?.phone || '+1 (555) 019-2834');
-  const [bio, setBio] = useState(user?.bio || 'Passionate hotel management student focused on guest hospitality, luxury services, and front-desk software systems.');
-  const [languages, setLanguages] = useState(user?.languages || 'English (Native), French (Conversational)');
+  const [phone, setPhone] = useState(user?.phone || '');
+  const [bio, setBio] = useState(user?.bio || '');
+  const [languages, setLanguages] = useState(user?.languages || '');
   
   const [education, setEducation] = useState(user?.education || '');
   const [eduGradYear, setEduGradYear] = useState(user?.eduGradYear || '');
@@ -64,7 +64,7 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
   };
 
   // Skills state
-  const [skills, setSkills] = useState(user?.skills || ['Front Office Operations', 'Opera PMS', 'Guest Relations', 'Bilingual']);
+  const [skills, setSkills] = useState(user?.skills || []);
   const [newSkill, setNewSkill] = useState('');
 
   // Internships state
@@ -78,13 +78,16 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
   const [showAddInternship, setShowAddInternship] = useState(false);
 
   // Certificates state
-  const [certificates, setCertificates] = useState(user?.certificates || ['ServSafe Manager', 'AHLEI Certified Front Desk Representative']);
+  const [certificates, setCertificates] = useState(user?.certificates || []);
   const [newCert, setNewCert] = useState('');
 
   // Resume state
-  const [resumeName, setResumeName] = useState(user?.resumeName || 'Alex_Mercer_Resume.pdf');
+  const [resumeName, setResumeName] = useState(user?.resumeName || null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [profileError, setProfileError] = useState('');
+  const [touched, setTouched] = useState({});
+
+  const handleBlur = (field) => setTouched(prev => ({...prev, [field]: true}));
 
   const handleAddSkill = (e) => {
     e.preventDefault();
@@ -227,7 +230,7 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
       {/* Header */}
       <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="font-display text-3xl font-extrabold text-slate-950 dark:text-white">Profile Builder</h1>
+          <h1 className="font-display text-3xl font-extrabold text-slate-950 dark:text-white">Career Portfolio</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Manage your digital resume, credentials, and internship details.</p>
         </div>
         
@@ -285,7 +288,7 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
             <h3 className="font-display text-lg font-bold text-slate-955 dark:text-white mt-4">{name || 'Your Name'}</h3>
             <span className="text-xs text-slate-400 mt-1">{email}</span>
             <div className="w-full border-t border-slate-200/50 dark:border-slate-850 my-4 pt-4 flex flex-col gap-2.5 text-xs text-slate-500 dark:text-slate-400 text-left">
-              <div><strong>Phone:</strong> {phone}</div>
+              <div><strong>Phone:</strong> +91 {phone}</div>
               <div className="flex items-center gap-1.5">
                 <Globe className="h-3.5 w-3.5 text-slate-450" />
                 <span>{languages}</span>
@@ -376,8 +379,12 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="rounded-xl border border-slate-205 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500"
+                  onBlur={() => handleBlur('name')}
+                  className={`rounded-xl border bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:bg-white dark:bg-slate-950 dark:text-white transition-colors ${
+                    touched.name && !name ? 'border-red-400 focus:border-red-500 dark:border-red-700' : 'border-slate-205 focus:border-blue-800 dark:border-slate-800 dark:focus:border-amber-500'
+                  }`}
                 />
+                {touched.name && !name && <p className="text-[10px] text-red-500 mt-0.5 ml-1">This field is required</p>}
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-455 uppercase tracking-wide">Email</label>
@@ -460,9 +467,11 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
                     value={location}
                     onChange={(e) => { setLocation(e.target.value); setShowLocationSuggestions(true); }}
                     onFocus={() => setShowLocationSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowLocationSuggestions(false), 200)}
+                    onBlur={() => { handleBlur('location'); setTimeout(() => setShowLocationSuggestions(false), 200); }}
                     placeholder="e.g. Mumbai, Maharashtra"
-                    className="w-full rounded-xl border border-slate-205 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500"
+                    className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:bg-white dark:bg-slate-950 dark:text-white transition-colors ${
+                      touched.location && !location ? 'border-red-400 focus:border-red-500 dark:border-red-700' : 'border-slate-205 focus:border-blue-800 dark:border-slate-800 dark:focus:border-amber-500'
+                    }`}
                   />
                   {showLocationSuggestions && location && (
                     <ul className="absolute z-10 w-full top-[100%] mt-1 max-h-48 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg">
@@ -479,6 +488,7 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
                     </ul>
                   )}
                 </div>
+                {touched.location && !location && <p className="text-[10px] text-red-500 mt-0.5 ml-1">This field is required</p>}
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-455 uppercase tracking-wide">Job Title (Optional)</label>
@@ -519,9 +529,11 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
                     value={school || education}
                     onChange={(e) => { setSchool(e.target.value); setEducation(e.target.value); setShowSchoolSuggestions(true); }}
                     onFocus={() => setShowSchoolSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowSchoolSuggestions(false), 200)}
+                    onBlur={() => { handleBlur('school'); setTimeout(() => setShowSchoolSuggestions(false), 200); }}
                     placeholder="e.g. IHM Pusa"
-                    className="w-full rounded-xl border border-slate-205 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500"
+                    className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:bg-white dark:bg-slate-950 dark:text-white transition-colors ${
+                      touched.school && !(school || education) ? 'border-red-400 focus:border-red-500 dark:border-red-700' : 'border-slate-205 focus:border-blue-800 dark:border-slate-800 dark:focus:border-amber-500'
+                    }`}
                   />
                   {showSchoolSuggestions && (school || education) && (
                     <ul className="absolute z-10 w-full top-[100%] mt-1 max-h-48 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg">
@@ -538,32 +550,41 @@ export default function Profile({ user, updateUser, setCurrentPage }) {
                     </ul>
                   )}
                 </div>
+                {touched.school && !(school || education) && <p className="text-[10px] text-red-500 mt-0.5 ml-1">This field is required</p>}
               </div>
               <div className="sm:col-span-2 flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-455 uppercase tracking-wide">Start Year</label>
                 <select
                   value={startYear}
                   onChange={(e) => setStartYear(e.target.value)}
-                  className="rounded-xl border border-slate-205 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500 cursor-pointer"
+                  onBlur={() => handleBlur('startYear')}
+                  className={`rounded-xl border bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:bg-white dark:bg-slate-950 dark:text-white cursor-pointer transition-colors ${
+                    touched.startYear && !startYear ? 'border-red-400 focus:border-red-500 dark:border-red-700' : 'border-slate-205 focus:border-blue-800 dark:border-slate-800 dark:focus:border-amber-500'
+                  }`}
                 >
                   <option value="" disabled>Select Year</option>
                   {YEAR_OPTIONS.map(yr => (
                     <option key={yr} value={yr}>{yr}</option>
                   ))}
                 </select>
+                {touched.startYear && !startYear && <p className="text-[10px] text-red-500 mt-0.5 ml-1">This field is required</p>}
               </div>
               <div className="sm:col-span-2 flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-455 uppercase tracking-wide">Graduation Year</label>
                 <select
                   value={endYear || eduGradYear}
                   onChange={(e) => { setEndYear(e.target.value); setEduGradYear(e.target.value); }}
-                  className="rounded-xl border border-slate-205 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-800 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:focus:border-amber-500 cursor-pointer"
+                  onBlur={() => handleBlur('endYear')}
+                  className={`rounded-xl border bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:bg-white dark:bg-slate-950 dark:text-white cursor-pointer transition-colors ${
+                    touched.endYear && !(endYear || eduGradYear) ? 'border-red-400 focus:border-red-500 dark:border-red-700' : 'border-slate-205 focus:border-blue-800 dark:border-slate-800 dark:focus:border-amber-500'
+                  }`}
                 >
                   <option value="" disabled>Select Year</option>
                   {YEAR_OPTIONS.map(yr => (
                     <option key={yr} value={yr}>{yr}</option>
                   ))}
                 </select>
+                {touched.endYear && !(endYear || eduGradYear) && <p className="text-[10px] text-red-500 mt-0.5 ml-1">This field is required</p>}
               </div>
             </div>
           </div>
